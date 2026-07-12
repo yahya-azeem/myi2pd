@@ -28,15 +28,19 @@ RUN git clone --depth 1 https://github.com/TrustTunnel/TrustTunnelClient.git .
 # Install dependencies needed by the build/bootstrap scripts
 RUN pip install --no-cache-dir -r requirements.txt
 
-
-# Run the Conan dependency bootstrap process
+# Run the Conan dependency bootstrap process to populate local cache with adguard recipes
 RUN python scripts/bootstrap_conan_deps.py
 
-# Configure and compile using CMake and Ninja
-RUN mkdir build \
-    && cd build \
-    && cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release \
-    && ninja
+# Install project dependencies via Conan and generate toolchain
+RUN conan install . --build=missing -s build_type=Release
+
+# Locate the toolchain, configure/compile using CMake + Ninja, and build the client executable target
+RUN TOOLCHAIN=$(find build -name "conan_toolchain.cmake") \
+    && cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=$TOOLCHAIN -DCMAKE_INSTALL_PREFIX=/opt/conan2 -GNinja \
+    && cmake --build build --target trusttunnel_client
+
+# Move the compiled client binary to a standard location in the builder
+RUN cp $(find build -name "trusttunnel_client" -type f -executable) /usr/local/bin/trusttunnel_client
 
 # Create final image assembler
 FROM alpine:3.20
@@ -51,8 +55,8 @@ RUN apk add --no-cache \
     bash \
     openssl
 
-# Copy pre-compiled TrustTunnel client from builder
-COPY --from=builder /tmp/trusttunnel-client-build/build/trusttunnel_client /usr/local/bin/
+# Copy pre-compiled TrustTunnel client from builder standard location
+COPY --from=builder /usr/local/bin/trusttunnel_client /usr/local/bin/
 
 # Clone official Alpine image-building scripts (aports)
 WORKDIR /usr/src
