@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir conan
 
 # Auto-detect default profile settings for Conan compiler detection
 RUN conan profile detect --force \
-    && echo -e "\n[platform_tool_requires]\ncmake/*\nninja/*\ngo/*" >> /tmp/.conan/profiles/default
+    && echo -e "\n[replace_tool_requires]\ncmake/*: cmake/system\nninja/*: ninja/system\ngo/*: go/system\n\n[platform_tool_requires]\ncmake/system\nninja/system\ngo/system" >> /tmp/.conan/profiles/default
 
 
 # Clone TrustTunnel C++ Client repository
