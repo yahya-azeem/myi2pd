@@ -117,7 +117,10 @@ ln -sf /etc/init.d/dbus /build/overlay/etc/runlevels/default/dbus
 ln -sf /etc/init.d/seatd /build/overlay/etc/runlevels/default/seatd
 
 # Run Alpine image builder
-sh mkimage.sh --profile myi2pd --output /build/myi2pd-amnesiac.iso --overlay /build/overlay
+sh mkimage.sh --profile myi2pd --outdir /build --overlay /build/overlay
+
+# Rename the generated ISO to the expected output filename
+mv /build/*.iso /build/myi2pd-amnesiac.iso
 
 echo "=== ISO built successfully! ==="
 EOF
