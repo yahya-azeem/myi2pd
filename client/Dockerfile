@@ -80,7 +80,7 @@ RUN mkdir -p /build/overlay/etc/init.d \
              /build/overlay/usr/local/bin \
              /build/overlay/root
 
-# Configure the myi2pd ISO profile
+# Configure the myi2pd ISO profile and the apkovl generator
 RUN cat <<'EOF' > mkimg.myi2pd.sh
 profile_myi2pd() {
     profile_standard
@@ -91,8 +91,21 @@ profile_myi2pd() {
     # Bundles the offline packages directory on the ISO
     apks="$apks nftables i2pd bash openssl wireless-tools wpa_supplicant e2fsprogs river fuzzel waybar foot font-dejavu seatd librewolf dbus mesa-dri-gallium udev"
     initfs_features="base ext4 squashfs kms network wireless"
+    apkovl="genapkovl-myi2pd.sh"
+    hostname="myi2pd"
 }
 EOF
+
+RUN cat <<'EOF' > genapkovl-myi2pd.sh
+#!/bin/sh
+set -e
+HOSTNAME="$1"
+
+# The structured overlay is located at /build/overlay
+# Create the apkovl tarball in the current directory (which is DESTDIR)
+tar -C /build/overlay -c -z -f "$HOSTNAME.apkovl.tar.gz" .
+EOF
+RUN chmod +x genapkovl-myi2pd.sh
 
 # Build execution script
 RUN cat <<'EOF' > /usr/local/bin/assemble-iso
@@ -116,8 +129,8 @@ ln -sf /etc/init.d/hdd-isolation /build/overlay/etc/runlevels/boot/hdd-isolation
 ln -sf /etc/init.d/dbus /build/overlay/etc/runlevels/default/dbus
 ln -sf /etc/init.d/seatd /build/overlay/etc/runlevels/default/seatd
 
-# Run Alpine image builder
-sh mkimage.sh --profile myi2pd --outdir /build --overlay /build/overlay
+# Run Alpine image builder using our apkovl profile configuration
+sh mkimage.sh --profile myi2pd --outdir /build
 
 # Rename the generated ISO to the expected output filename
 mv /build/*.iso /build/myi2pd-amnesiac.iso
