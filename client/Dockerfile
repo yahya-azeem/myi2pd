@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile to compile TrustTunnel and build custom myi2pd ISO under 1 GB footprint
-FROM alpine:3.20 AS builder
+FROM alpine:edge AS builder
 
 # Install build dependencies for TrustTunnel client compilation
 RUN apk add --no-cache \
