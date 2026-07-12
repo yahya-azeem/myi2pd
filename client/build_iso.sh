@@ -22,6 +22,8 @@ mkdir -p "$OVERLAY_TMP" "$OUT_DIR"
 
 echo "Structuring overlay directories..."
 mkdir -p "$OVERLAY_TMP/etc/init.d" \
+         "$OVERLAY_TMP/etc/network" \
+         "$OVERLAY_TMP/etc/trusttunnel" \
          "$OVERLAY_TMP/etc/nftables" \
          "$OVERLAY_TMP/etc/i2pd" \
          "$OVERLAY_TMP/etc/librewolf" \
@@ -29,6 +31,7 @@ mkdir -p "$OVERLAY_TMP/etc/init.d" \
          "$OVERLAY_TMP/etc/xdg/waybar" \
          "$OVERLAY_TMP/usr/local/bin" \
          "$OVERLAY_TMP/root"
+
 
 # Copy configurations into overlay locations
 echo "Copying config templates to overlay..."
