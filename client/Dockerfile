@@ -1,22 +1,20 @@
 # Multi-stage Dockerfile to compile TrustTunnel and build custom myi2pd ISO under 1 GB footprint
 FROM alpine:edge AS builder
 
-# Install build dependencies for TrustTunnel client compilation
+# Install build dependencies for TrustTunnel C++ client compilation
 RUN apk add --no-cache \
     build-base \
     git \
-    rust \
-    cargo \
-    openssl-dev \
     cmake \
-    clang-dev \
-    llvm-dev \
-    perl
+    openssl-dev
 
-# Clone and compile TrustTunnel static binaries
-WORKDIR /tmp/trusttunnel-build
-RUN git clone --depth 1 https://github.com/TrustTunnel/TrustTunnel.git . \
-    && cargo build --release --bins
+# Clone and compile TrustTunnel C++ Client
+WORKDIR /tmp/trusttunnel-client-build
+RUN git clone --depth 1 https://github.com/TrustTunnel/TrustTunnelClient.git . \
+    && mkdir build \
+    && cd build \
+    && cmake .. \
+    && make
 
 # Create final image assembler
 FROM alpine:3.20
@@ -31,9 +29,9 @@ RUN apk add --no-cache \
     bash \
     openssl
 
-# Copy pre-compiled TrustTunnel binaries from builder
-COPY --from=builder /tmp/trusttunnel-build/target/release/trusttunnel_client /usr/local/bin/
-COPY --from=builder /tmp/trusttunnel-build/target/release/setup_wizard /usr/local/bin/
+# Copy pre-compiled TrustTunnel client from builder
+COPY --from=builder /tmp/trusttunnel-client-build/build/trusttunnel_client /usr/local/bin/
+
 
 # Clone official Alpine image-building scripts (aports)
 WORKDIR /usr/src
