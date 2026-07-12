@@ -108,6 +108,9 @@ cp /usr/local/bin/trusttunnel_client /build/overlay/usr/local/bin/
 chmod +x /build/overlay/usr/local/bin/*
 chmod +x /build/overlay/etc/init.d/*
 
+# Ensure runlevels directories exist in overlay
+mkdir -p /build/overlay/etc/runlevels/boot /build/overlay/etc/runlevels/default
+
 # Enable OpenRC services in the boot and default runlevels on the client
 ln -sf /etc/init.d/hdd-isolation /build/overlay/etc/runlevels/boot/hdd-isolation
 ln -sf /etc/init.d/dbus /build/overlay/etc/runlevels/default/dbus
