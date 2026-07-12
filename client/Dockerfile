@@ -69,7 +69,7 @@ profile_myi2pd() {
 EOF
 
 # Build execution script
-cat <<'EOF' > /usr/local/bin/assemble-iso
+RUN cat <<'EOF' > /usr/local/bin/assemble-iso
 #!/bin/bash
 set -e
 
