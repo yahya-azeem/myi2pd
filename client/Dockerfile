@@ -10,7 +10,8 @@ RUN apk add --no-cache \
     python3 \
     py3-pip \
     go \
-    ninja
+    ninja \
+    linux-headers
 
 # Set up Conan package manager
 ENV CONAN_HOME=/tmp/.conan
