@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile to compile TrustTunnel and build custom myi2pd ISO under 1 GB footprint
+# Multi-stage Dockerfile to compile TrustTunnel C++ Client and build custom myi2pd ISO
 FROM alpine:edge AS builder
 
 # Install build dependencies for TrustTunnel C++ client compilation
@@ -6,15 +6,36 @@ RUN apk add --no-cache \
     build-base \
     git \
     cmake \
-    openssl-dev
+    openssl-dev \
+    python3 \
+    py3-pip \
+    go \
+    ninja
 
-# Clone and compile TrustTunnel C++ Client
+# Set up Conan package manager
+ENV CONAN_HOME=/tmp/.conan
+RUN python3 -m venv /opt/conan-env
+ENV PATH="/opt/conan-env/bin:$PATH"
+RUN pip install --no-cache-dir conan
+
+# Auto-detect default profile settings for Conan compiler detection
+RUN conan profile detect --force
+
+# Clone TrustTunnel C++ Client repository
 WORKDIR /tmp/trusttunnel-client-build
-RUN git clone --depth 1 https://github.com/TrustTunnel/TrustTunnelClient.git . \
-    && mkdir build \
+RUN git clone --depth 1 https://github.com/TrustTunnel/TrustTunnelClient.git .
+
+# Install dependencies needed by the build/bootstrap scripts
+RUN pip install --no-cache-dir -r scripts/requirements.txt
+
+# Run the Conan dependency bootstrap process
+RUN python scripts/bootstrap_conan_deps.py
+
+# Configure and compile using CMake and Ninja
+RUN mkdir build \
     && cd build \
-    && cmake .. \
-    && make
+    && cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release \
+    && ninja
 
 # Create final image assembler
 FROM alpine:3.20
@@ -31,7 +52,6 @@ RUN apk add --no-cache \
 
 # Copy pre-compiled TrustTunnel client from builder
 COPY --from=builder /tmp/trusttunnel-client-build/build/trusttunnel_client /usr/local/bin/
-
 
 # Clone official Alpine image-building scripts (aports)
 WORKDIR /usr/src
