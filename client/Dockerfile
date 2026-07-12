@@ -26,7 +26,8 @@ WORKDIR /tmp/trusttunnel-client-build
 RUN git clone --depth 1 https://github.com/TrustTunnel/TrustTunnelClient.git .
 
 # Install dependencies needed by the build/bootstrap scripts
-RUN pip install --no-cache-dir -r scripts/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
 
 # Run the Conan dependency bootstrap process
 RUN python scripts/bootstrap_conan_deps.py
