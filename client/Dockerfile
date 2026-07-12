@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir conan
 
 # Auto-detect default profile settings for Conan compiler detection
 RUN conan profile detect --force \
-    && echo -e "\n[platform_tool_requires]\ncmake/*\nninja/*" >> /tmp/.conan/profiles/default
+    && echo -e "\n[platform_tool_requires]\ncmake/*\nninja/*\ngo/*" >> /tmp/.conan/profiles/default
 
 
 # Clone TrustTunnel C++ Client repository
@@ -34,7 +34,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN python scripts/bootstrap_conan_deps.py
 
 # Install project dependencies via Conan and generate toolchain
-RUN conan install . --build=missing -s build_type=Release
+RUN conan install . -pr:b default -pr:h default --build=missing -s build_type=Release
 
 # Locate the toolchain, configure/compile using CMake + Ninja, and build the client executable target
 RUN TOOLCHAIN=$(find build -name "conan_toolchain.cmake") \
