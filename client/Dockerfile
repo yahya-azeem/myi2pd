@@ -19,7 +19,9 @@ ENV PATH="/opt/conan-env/bin:$PATH"
 RUN pip install --no-cache-dir conan
 
 # Auto-detect default profile settings for Conan compiler detection
-RUN conan profile detect --force
+RUN conan profile detect --force \
+    && echo -e "\n[platform_tool_requires]\ncmake/*\nninja/*" >> /tmp/.conan/profiles/default
+
 
 # Clone TrustTunnel C++ Client repository
 WORKDIR /tmp/trusttunnel-client-build
