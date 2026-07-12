@@ -1,0 +1,19 @@
+window#waybar {
+    background: #111111;
+    color: #ffffff;
+    font-family: "DejaVu Sans", sans-serif;
+    font-size: 13px;
+}
+
+#custom-librewolf {
+    background: #0055ff;
+    color: white;
+    padding: 0px 15px;
+    font-weight: bold;
+    border-radius: 4px;
+    margin: 2px;
+}
+
+#custom-librewolf:hover {
+    background: #0033aa;
+}

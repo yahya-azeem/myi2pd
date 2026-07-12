@@ -1,0 +1,9 @@
+#!/bin/sh
+# myi2pd LibreWolf Launcher - Enforces RAM-only storage profile to prevent digital forensics
+
+export HOME=/tmp/librewolf-session
+mkdir -p /tmp/librewolf-session/.librewolf
+cp /etc/librewolf/librewolf.overrides.cfg /tmp/librewolf-session/.librewolf/
+
+# Execute the actual LibreWolf binary passing any arguments
+exec librewolf "$@"

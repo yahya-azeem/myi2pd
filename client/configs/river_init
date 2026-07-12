@@ -1,0 +1,33 @@
+#!/bin/sh
+# myi2pd River Compositor Init Configuration
+
+# Set the modifier key to Super (Windows Key)
+MOD="Mod4"
+
+# --- Hardcoded Shortkeys ---
+# Super + B: Launch Hardened LibreWolf
+riverctl map normal $MOD B spawn "librewolf"
+
+# Super + D: Launch Application Menu (Fuzzel)
+riverctl map normal $MOD D spawn "fuzzel --dmenu"
+
+# Super + Return: Open foot terminal
+riverctl map normal $MOD Return spawn "foot"
+
+# Super + Q: Close active window
+riverctl map normal $MOD Q close
+
+# Super + Shift + E: Exit River compositor (log out of GUI)
+riverctl map normal $MOD Shift E exit
+
+# --- Window Layout and Tiling Rules ---
+# Default to layout tile
+riverctl default-layout rivertile
+riverctl spawn "rivertile -view-padding 4 -outer-padding 4"
+
+# --- Startup Applications ---
+# Start Waybar status panel
+waybar &
+
+# Auto-spawn the interactive Wi-Fi connection wizard inside a foot terminal window on bootup
+foot -T "myi2pd Wi-Fi Connection Setup" /usr/local/bin/wifi-connect.sh &

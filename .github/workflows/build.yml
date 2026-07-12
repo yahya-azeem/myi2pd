@@ -1,0 +1,30 @@
+name: Build myi2pd Amnesiac ISO
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build ISO
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Build custom Alpine ISO
+        run: |
+          chmod +x client/build_iso.sh
+          ./client/build_iso.sh
+
+      - name: Upload ISO Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: myi2pd-amnesiac-iso
+          path: myi2pd-amnesiac.iso
+          compression-level: 0 # ISO is already compressed, no need to waste CPU
+          retention-days: 7

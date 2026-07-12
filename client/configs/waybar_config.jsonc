@@ -1,0 +1,15 @@
+{
+    "layer": "top",
+    "position": "top",
+    "height": 30,
+    "modules-left": ["custom/librewolf", "river/tags"],
+    "modules-center": ["river/window"],
+    "modules-right": ["clock"],
+
+    // --- The Dedicated LibreWolf Quick-Launch Button ---
+    "custom/librewolf": {
+        "format": "🌐 LAUNCH HARDENED BROWSER (LIBREWOLF)",
+        "on-click": "/usr/local/bin/librewolf-launcher",
+        "tooltip": false
+    }
+}

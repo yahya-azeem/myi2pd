@@ -1,0 +1,14 @@
+# root/.profile - Auto-starts River dynamic tiling compositor on login from virtual tty1
+
+if [ -f /etc/profile ]; then
+    . /etc/profile
+fi
+
+# Check if logged in on virtual terminal tty1
+if [ "$(tty)" = "/dev/tty1" ]; then
+    echo "Starting graphical environment (River Composer)..."
+    # Ensure seatd is running for device permissions management
+    rc-service seatd start || true
+    # Launch River
+    exec seatd-launch river
+fi

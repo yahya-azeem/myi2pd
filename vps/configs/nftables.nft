@@ -1,0 +1,45 @@
+table inet filter {
+    chain input {
+        type filter hook input priority 0; policy drop;
+
+        # Allow established loopback traffic
+        iif "lo" accept
+
+        # Allow established/related connections
+        ct state established,related accept
+
+        # Allow SSH (Port 22) for administrator access
+        tcp dport 22 accept
+
+        # TrustTunnel Endpoint (Disguised as standard HTTPS)
+        tcp dport 443 accept
+        udp dport 443 accept
+
+        # Dedicated static I2P network routing port
+        tcp dport 25432 accept
+        udp dport 25432 accept
+    }
+
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+
+        # Forward traffic originating from the TrustTunnel VPN interface (e.g. tun0)
+        iifname "tun+" accept
+
+        # Forward return traffic for established connections
+        oifname "tun+" ct state established,related accept
+    }
+
+    chain output {
+        type filter hook output priority 0; policy accept;
+    }
+}
+
+table ip nat {
+    chain postrouting {
+        type nat hook postrouting priority 100; policy accept;
+
+        # Masquerade traffic from the VPN subnet (10.0.0.0/24) out to the WAN
+        ip saddr 10.0.0.0/24 masquerade
+    }
+}

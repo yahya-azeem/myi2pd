@@ -1,0 +1,3 @@
+#!/bin/sh
+# Bypass credentials prompt and log in root automatically to physical tty
+exec /bin/login -f root

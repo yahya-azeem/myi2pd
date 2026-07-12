@@ -1,0 +1,21 @@
+#!/sbin/openrc-run
+
+depend() {
+    before localmount
+}
+
+start() {
+    ebegin "Locking down and isolating internal physical disks"
+
+    # Loop through all detected block devices (sda, nvme, mmcblk)
+    for dev in /sys/block/*; do
+        devname=$(basename "$dev")
+        if echo "$devname" | grep -qE "^(sd|nvme|mmcblk)"; then
+            # Forcefully unmount any attempts to touch internal partitions
+            umount -f /dev/${devname}* 2>/dev/null || true
+            # Lock the physical device to read-only at the kernel block level
+            blockdev --setro /dev/"$devname" 2>/dev/null || true
+        fi
+    done
+    eend 0
+}

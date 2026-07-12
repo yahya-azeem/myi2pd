@@ -1,0 +1,35 @@
+table inet filter {
+    # Set to store the dynamic VPS IP address entered on boot
+    set vps_ip {
+        type ipv4_addr
+        flags interval
+    }
+
+    chain input {
+        type filter hook input priority 0; policy drop;
+        iif "lo" accept
+        ct state established,related accept
+    }
+
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+    }
+
+    chain output {
+        type filter hook output priority 0; policy drop;
+
+        # Rule 1: Allow loopback for internal IPC/proxies
+        oif "lo" accept
+
+        # Rule 2: Allow local DNS queries for wlan0 initialization (optional/limited to DHCP)
+        # We allow DHCP client packets out to find IP
+        udp dport 67-68 accept
+
+        # Rule 3: Allow connection to the dynamic VPS IP on port 443
+        ip daddr @vps_ip tcp dport 443 accept
+        ip daddr @vps_ip udp dport 443 accept
+
+        # Rule 4: Allow all traffic over the established VPN tunnel interface
+        oif "tun0" accept
+    }
+}
