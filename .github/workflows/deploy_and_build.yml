@@ -1,0 +1,92 @@
+name: Deploy VPS and Build Amnesiac ISO
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy_vps:
+    name: Deploy Hardened VPS Gateway
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+
+      - name: Clean up Conflicting myi2pd Resources (Stay in Free Tier)
+        env:
+          VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
+        run: |
+          chmod +x shared/destroy_old_vps.sh
+          ./shared/destroy_old_vps.sh
+
+      - name: Set up SSH Private Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Terraform Init
+        working-directory: vps/terraform
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: vps/terraform
+        env:
+          TF_VAR_vultr_api_key: ${{ secrets.VULTR_API_KEY }}
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+          TF_VAR_ssh_private_key_path: /home/runner/.ssh/id_rsa
+        run: terraform apply -auto-approve
+
+      - name: Extract VPS Public IP
+        working-directory: vps/terraform
+        id: get_ip
+        run: |
+          VPS_IP=$(terraform output -raw vps_ip)
+          echo "VPS_IP=$VPS_IP" >> $GITHUB_OUTPUT
+          echo "$VPS_IP" > ../../client/configs/vps_ip.txt
+
+      - name: Upload VPS IP as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vps-ip
+          path: client/configs/vps_ip.txt
+          retention-days: 1
+
+  build_iso:
+    name: Build Amnesiac Client ISO
+    needs: deploy_vps
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download VPS IP Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: vps-ip
+          path: client/configs
+
+      - name: Verify VPS IP Configuration
+        run: |
+          echo "VPS IP configured: $(cat client/configs/vps_ip.txt)"
+
+      - name: Build Custom Alpine ISO
+        run: |
+          chmod +x client/build_iso.sh
+          ./client/build_iso.sh
+
+      - name: Upload ISO Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: myi2pd-amnesiac-iso
+          path: myi2pd-amnesiac.iso
+          compression-level: 0
+          retention-days: 7

@@ -48,6 +48,12 @@ cp "$WORKSPACE_DIR/configs/nftables.nft"            "$OVERLAY_TMP/etc/nftables/n
 cp "$WORKSPACE_DIR/configs/i2pd.conf"              "$OVERLAY_TMP/etc/i2pd/i2pd.conf"
 cp "$WORKSPACE_DIR/configs/librewolf.overrides.cfg" "$OVERLAY_TMP/etc/librewolf/librewolf.overrides.cfg"
 
+# Copy pre-configured VPS IP if it exists
+if [ -f "$WORKSPACE_DIR/configs/vps_ip.txt" ]; then
+    echo "Pre-configuring ISO with VPS IP: $(cat $WORKSPACE_DIR/configs/vps_ip.txt)"
+    cp "$WORKSPACE_DIR/configs/vps_ip.txt" "$OVERLAY_TMP/etc/trusttunnel/vps_ip.txt"
+fi
+
 # Create dummy hostname
 echo "myi2pd" > "$OVERLAY_TMP/etc/hostname"
 

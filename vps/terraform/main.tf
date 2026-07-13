@@ -25,7 +25,7 @@ data "vultr_snapshot" "myi2pd_snap" {
 }
 
 resource "vultr_instance" "myi2pd_vps" {
-  plan        = "vc2-1c-0.5gb" # Vultr Cloud Compute Free Tier / lowest tier (1 vCPU, 512MB RAM)
+  plan        = "vps-free-1c-0.5gb-10gb" # Vultr Cloud Compute Free Tier (1 vCPU, 512MB RAM, 10GB Disk)
   region      = var.vultr_region
   os_id       = var.use_packer_snapshot ? null : 382 # OS ID for Alpine Linux (only if not using snapshot)
   snapshot_id = var.use_packer_snapshot ? data.vultr_snapshot.myi2pd_snap[0].id : null
