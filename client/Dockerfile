@@ -51,6 +51,7 @@ FROM alpine:3.20
 # Install image building toolchain dependencies
 RUN apk add --no-cache \
     alpine-sdk \
+    alpine-conf \
     xorriso \
     syslinux \
     squashfs-tools \
