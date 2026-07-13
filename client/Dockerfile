@@ -130,7 +130,7 @@ ln -sf /etc/init.d/dbus /build/overlay/etc/runlevels/default/dbus
 ln -sf /etc/init.d/seatd /build/overlay/etc/runlevels/default/seatd
 
 # Run Alpine image builder using our apkovl profile configuration
-sh mkimage.sh --profile myi2pd --outdir /build
+sh mkimage.sh --profile myi2pd --repository https://dl-cdn.alpinelinux.org/alpine/edge/main --repository https://dl-cdn.alpinelinux.org/alpine/edge/community --outdir /build
 
 # Rename the generated ISO to the expected output filename
 mv /build/*.iso /build/myi2pd-amnesiac.iso
