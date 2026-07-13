@@ -62,9 +62,10 @@ RUN apk add --no-cache \
 # Copy pre-compiled TrustTunnel client from builder standard location
 COPY --from=builder /usr/local/bin/trusttunnel_client /usr/local/bin/
 
-# Clone official Alpine image-building scripts (aports)
+# Clone official Alpine image-building scripts (aports) and patch apk v3 --no-chown compatibility
 WORKDIR /usr/src
-RUN git clone --depth 1 https://gitlab.alpinelinux.org/alpine/aports.git
+RUN git clone --depth 1 https://gitlab.alpinelinux.org/alpine/aports.git \
+    && sed -i 's/--no-chown//g' aports/scripts/mkimage.sh
 
 WORKDIR /usr/src/aports/scripts
 
