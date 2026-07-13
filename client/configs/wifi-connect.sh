@@ -13,16 +13,31 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
+# Discover wireless interface name
+WLAN_INTF=$(ip link | awk -F': ' '/state/ {print $2}' | grep -E '^(wlan|wlp|wls)' | head -n 1)
+if [ -z "$WLAN_INTF" ]; then
+    # Fallback search in sysfs
+    for dev in /sys/class/net/*; do
+        if [ -d "$dev/wireless" ] || [ -d "$dev/phy80211" ]; then
+            WLAN_INTF=$(basename "$dev")
+            break
+        fi
+    done
+fi
+WLAN_INTF=${WLAN_INTF:-wlan0}
+
+echo "Using wireless interface: $WLAN_INTF"
+
 # Bring interface up
-ip link set wlan0 up || true
+ip link set "$WLAN_INTF" up || true
 sleep 1
 
 echo "Scanning for available Wi-Fi networks..."
 networks=""
 if which iwlist >/dev/null 2>&1; then
-    networks=$(iwlist wlan0 scan 2>/dev/null | grep -i "essid" | cut -d':' -f2 | tr -d '"' | sort -u)
+    networks=$(iwlist "$WLAN_INTF" scan 2>/dev/null | grep -i "essid" | cut -d':' -f2 | tr -d '"' | sort -u)
 elif which iw >/dev/null 2>&1; then
-    networks=$(iw dev wlan0 scan 2>/dev/null | grep -i "ssid" | cut -d' ' -f2- | sort -u)
+    networks=$(iw dev "$WLAN_INTF" scan 2>/dev/null | grep -i "ssid" | cut -d' ' -f2- | sort -u)
 fi
 
 if [ -n "$networks" ]; then
@@ -63,15 +78,15 @@ EOF
 killall wpa_supplicant >/dev/null 2>&1 || true
 
 echo "Connecting to '${ssid}'..."
-wpa_supplicant -B -i wlan0 -c /tmp/wpa_supplicant.conf
+wpa_supplicant -B -i "$WLAN_INTF" -c /tmp/wpa_supplicant.conf
 
 echo "Acquiring IP address via DHCP..."
-udhcpc -q -n -i wlan0 || true
+udhcpc -q -n -i "$WLAN_INTF" || true
 
 COUNTER=0
 HAS_IP=false
 while [ $COUNTER -lt 15 ]; do
-    if ip addr show dev wlan0 | grep -q "inet "; then
+    if ip addr show dev "$WLAN_INTF" | grep -q "inet "; then
         HAS_IP=true
         break
     fi
@@ -86,7 +101,7 @@ if [ "$HAS_IP" = "false" ]; then
     exit 1
 fi
 
-echo "[OK] Connected! Local IP: $(ip addr show dev wlan0 | grep "inet " | head -n 1 | awk '{print $2}' | cut -d'/' -f1)"
+echo "[OK] Connected! Local IP: $(ip addr show dev "$WLAN_INTF" | grep "inet " | head -n 1 | awk '{print $2}' | cut -d'/' -f1)"
 
 # Securely wipe the wpa_supplicant config containing password from RAM
 rm -f /tmp/wpa_supplicant.conf

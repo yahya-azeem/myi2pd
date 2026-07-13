@@ -6,7 +6,7 @@ MOD="Mod4"
 
 # --- Hardcoded Shortkeys ---
 # Super + B: Launch Hardened LibreWolf
-riverctl map normal $MOD B spawn "librewolf"
+riverctl map normal $MOD B spawn "librewolf-launcher"
 
 # Super + D: Launch Application Menu (Fuzzel)
 riverctl map normal $MOD D spawn "fuzzel --dmenu"

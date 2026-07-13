@@ -46,7 +46,7 @@ RUN TOOLCHAIN=$(find build -name "conan_toolchain.cmake") \
 RUN cp $(find build -name "trusttunnel_client" -type f -executable) /usr/local/bin/trusttunnel_client
 
 # Create final image assembler
-FROM alpine:3.20
+FROM alpine:edge
 
 # Install image building toolchain dependencies
 RUN apk add --no-cache \
@@ -90,7 +90,7 @@ profile_myi2pd() {
     arch="x86_64"
     kernel_flavors="virt"
     # Bundles the offline packages directory on the ISO
-    apks="$apks nftables i2pd bash openssl wireless-tools wpa_supplicant e2fsprogs river fuzzel waybar foot font-dejavu seatd librewolf dbus mesa-dri-gallium udev"
+    apks="$apks nftables i2pd bash openssl wireless-tools wpa_supplicant e2fsprogs river fuzzel waybar foot font-dejavu seatd librewolf dbus mesa-dri-gallium udev util-linux util-linux-misc"
     initfs_features="base ext4 squashfs kms network wireless"
     apkovl="genapkovl-myi2pd.sh"
     hostname="myi2pd"

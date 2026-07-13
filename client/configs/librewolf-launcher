@@ -6,4 +6,5 @@ mkdir -p /tmp/librewolf-session/.librewolf
 cp /etc/librewolf/librewolf.overrides.cfg /tmp/librewolf-session/.librewolf/
 
 # Execute the actual LibreWolf binary passing any arguments
-exec librewolf "$@"
+# Include --no-sandbox to allow running as the root user in the diskless live RAM environment
+exec librewolf --no-sandbox "$@"
