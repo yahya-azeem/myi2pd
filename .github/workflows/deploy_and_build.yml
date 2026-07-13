@@ -1,10 +1,6 @@
 name: Deploy VPS and Build Amnesiac ISO
 
 on:
-  push:
-    branches:
-      - main
-      - master
   workflow_dispatch:
 
 jobs:
