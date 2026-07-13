@@ -4,8 +4,29 @@ on:
   workflow_dispatch:
 
 jobs:
+  build_iso:
+    name: Build Amnesiac Client ISO
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Build Custom Alpine ISO
+        run: |
+          chmod +x client/build_iso.sh
+          ./client/build_iso.sh
+
+      - name: Upload ISO Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: myi2pd-amnesiac-iso
+          path: myi2pd-amnesiac.iso
+          compression-level: 0
+          retention-days: 7
+
   deploy_vps:
     name: Deploy Hardened VPS Gateway
+    needs: build_iso
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -48,48 +69,11 @@ jobs:
           TF_VAR_vultr_api_key: ${{ secrets.VULTR_API_KEY }}
         run: terraform apply -auto-approve
 
-      - name: Extract VPS Public IP
+      - name: Extract and Print VPS Public IP
         working-directory: vps/terraform
-        id: get_ip
         run: |
           VPS_IP=$(terraform output -raw vps_ip)
-          echo "VPS_IP=$VPS_IP" >> $GITHUB_OUTPUT
-          echo "$VPS_IP" > ../../client/configs/vps_ip.txt
-
-      - name: Upload VPS IP as Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: vps-ip
-          path: client/configs/vps_ip.txt
-          retention-days: 1
-
-  build_iso:
-    name: Build Amnesiac Client ISO
-    needs: deploy_vps
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Download VPS IP Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: vps-ip
-          path: client/configs
-
-      - name: Verify VPS IP Configuration
-        run: |
-          echo "VPS IP configured: $(cat client/configs/vps_ip.txt)"
-
-      - name: Build Custom Alpine ISO
-        run: |
-          chmod +x client/build_iso.sh
-          ./client/build_iso.sh
-
-      - name: Upload ISO Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: myi2pd-amnesiac-iso
-          path: myi2pd-amnesiac.iso
-          compression-level: 0
-          retention-days: 7
+          echo "=================================================="
+          echo "    myi2pd VPS Gateway successfully deployed!     "
+          echo "    Public IP Address: $VPS_IP                    "
+          echo "=================================================="
