@@ -52,4 +52,19 @@ else
     echo "No conflicting myi2pd SSH keys found."
 fi
 
+# 3. Fetch and delete conflicting snapshots named "myi2pd-hardened-alpine-vps"
+echo "Checking for conflicting myi2pd snapshots..."
+SNAP_JSON=$(curl -s "https://api.vultr.com/v2/snapshots" -H "Authorization: Bearer ${VULTR_API_KEY}")
+SNAP_IDS=$(echo "$SNAP_JSON" | jq -r '.snapshots[] | select(.description == "myi2pd-hardened-alpine-vps") | .id')
+
+if [ -n "$SNAP_IDS" ]; then
+    for id in $SNAP_IDS; do
+        echo "Found conflicting snapshot ID: $id. Deleting..."
+        curl -s -X DELETE "https://api.vultr.com/v2/snapshots/$id" -H "Authorization: Bearer ${VULTR_API_KEY}"
+    done
+    echo "[OK] Conflicting snapshots deleted."
+else
+    echo "No conflicting myi2pd snapshots found."
+fi
+
 echo "Vultr environment clean and ready for deployment."

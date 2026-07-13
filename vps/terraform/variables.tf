@@ -14,15 +14,3 @@ variable "ssh_public_key" {
   type        = string
   description = "Public SSH key to install on the instance"
 }
-
-variable "ssh_private_key_path" {
-  type        = string
-  description = "Local path to the private SSH key corresponding to ssh_public_key"
-  default     = "~/.ssh/id_rsa"
-}
-
-variable "use_packer_snapshot" {
-  type        = bool
-  description = "Set to true to deploy using a pre-built Packer snapshot instead of a raw OS installation"
-  default     = false
-}
