@@ -11,6 +11,27 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image with Caching
+        uses: docker/build-push-action@v6
+        with:
+          context: ./client
+          file: ./client/Dockerfile
+          tags: myi2pd-builder:latest
+          outputs: type=docker,dest=/tmp/myi2pd-builder.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Load Docker Image
+        run: |
+          docker load -i /tmp/myi2pd-builder.tar
+          docker tag myi2pd-builder:latest myi2pd-builder
+
       - name: Build Custom Alpine ISO
         run: |
           chmod +x client/build_iso.sh
@@ -25,7 +46,7 @@ jobs:
           retention-days: 7
 
   deploy_vps:
-    name: Deploy Hardened VPS Gateway
+    name: Deploy or Restore VPS Gateway
     needs: build_iso
     runs-on: ubuntu-latest
     steps:
@@ -37,43 +58,15 @@ jobs:
         with:
           terraform_version: 1.5.7
 
-      - name: Clean up Conflicting myi2pd Resources (Stay in Free Tier)
-        env:
-          VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
-        run: |
-          chmod +x shared/destroy_old_vps.sh
-          ./shared/destroy_old_vps.sh
-
       - name: Setup Packer
         uses: hashicorp/setup-packer@main
         with:
           version: "latest"
 
-      - name: Install Packer plugins
-        working-directory: vps/packer
-        run: packer init vps_image.pkr.hcl
-
-      - name: Build VPS Packer Snapshot
-        working-directory: vps/packer
+      - name: Run Deploy or Restore Manager
         env:
           VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
-        run: packer build vps_image.pkr.hcl
-
-      - name: Terraform Init
-        working-directory: vps/terraform
-        run: terraform init
-
-      - name: Terraform Apply
-        working-directory: vps/terraform
-        env:
-          TF_VAR_vultr_api_key: ${{ secrets.VULTR_API_KEY }}
-        run: terraform apply -auto-approve
-
-      - name: Extract and Print VPS Public IP
-        working-directory: vps/terraform
+          VPS_IP: ${{ secrets.VPS_IP }}
         run: |
-          VPS_IP=$(terraform output -raw vps_ip)
-          echo "=================================================="
-          echo "    myi2pd VPS Gateway successfully deployed!     "
-          echo "    Public IP Address: $VPS_IP                    "
-          echo "=================================================="
+          chmod +x shared/deploy_or_restore.sh
+          ./shared/deploy_or_restore.sh

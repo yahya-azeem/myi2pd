@@ -67,8 +67,12 @@ iface wlan0 inet dhcp
     wpa-conf /etc/wpa_supplicant/wpa_supplicant.conf
 EOF
 
-echo "Building Docker environment (this compiles TrustTunnel statically)..."
-docker build -t myi2pd-builder "$WORKSPACE_DIR"
+if ! docker image inspect myi2pd-builder >/dev/null 2>&1; then
+    echo "Building Docker environment (this compiles TrustTunnel statically)..."
+    docker build -t myi2pd-builder "$WORKSPACE_DIR"
+else
+    echo "Using pre-built/cached myi2pd-builder Docker image..."
+fi
 
 echo "Executing build packaging inside container..."
 docker run --rm --privileged \
