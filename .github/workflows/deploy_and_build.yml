@@ -50,7 +50,6 @@ jobs:
         working-directory: vps/terraform
         env:
           TF_VAR_vultr_api_key: ${{ secrets.VULTR_API_KEY }}
-          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
         run: terraform apply -auto-approve
 
       - name: Extract VPS Public IP

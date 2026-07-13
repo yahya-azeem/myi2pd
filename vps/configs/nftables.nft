@@ -8,9 +8,6 @@ table inet filter {
         # Allow established/related connections
         ct state established,related accept
 
-        # Allow SSH (Port 22) for administrator access
-        tcp dport 22 accept
-
         # TrustTunnel Endpoint (Disguised as standard HTTPS)
         tcp dport 443 accept
         udp dport 443 accept

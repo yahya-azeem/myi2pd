@@ -10,7 +10,3 @@ variable "vultr_region" {
   default     = "ewr"
 }
 
-variable "ssh_public_key" {
-  type        = string
-  description = "Public SSH key to install on the instance"
-}

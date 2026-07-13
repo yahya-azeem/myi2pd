@@ -11,11 +11,6 @@ provider "vultr" {
   api_key = var.vultr_api_key
 }
 
-resource "vultr_ssh_key" "myi2pd_key" {
-  name    = "myi2pd-ssh-key"
-  ssh_key = var.ssh_public_key
-}
-
 data "vultr_snapshot" "myi2pd_snap" {
   filter {
     name   = "description"
@@ -33,6 +28,4 @@ resource "vultr_instance" "myi2pd_vps" {
   enable_ipv6 = false
   backups     = "disabled"
   ddos        = false
-
-  ssh_key_ids = [vultr_ssh_key.myi2pd_key.id]
 }

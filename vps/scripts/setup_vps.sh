@@ -31,7 +31,6 @@ echo "Configuring nftables whitelist firewall..."
 # Copy configuration to standard location
 cp /etc/myi2pd-configs/nftables.nft /etc/nftables.nft
 rc-update add nftables default
-rc-service nftables start || rc-service nftables restart
 
 # 4. Install and Tune i2pd (low resource constraints)
 echo "Installing and tuning i2pd daemon..."
@@ -46,7 +45,6 @@ chown i2pd:i2pd /etc/i2pd/i2pd.conf
 
 # Start i2pd service
 rc-update add i2pd default
-rc-service i2pd start || rc-service i2pd restart
 
 # 5. Build and Configure TrustTunnel Server
 echo "Installing compiler toolchain and building TrustTunnel..."
@@ -119,6 +117,5 @@ chmod +x /etc/init.d/trusttunnel
 
 # Start TrustTunnel
 rc-update add trusttunnel default
-rc-service trusttunnel start || rc-service trusttunnel restart
 
 echo "=== myi2pd VPS Gateway Setup Completed Successfully! ==="
