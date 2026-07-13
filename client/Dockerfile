@@ -93,6 +93,7 @@ profile_myi2pd() {
     initfs_features="base ext4 squashfs kms network wireless"
     apkovl="genapkovl-myi2pd.sh"
     hostname="myi2pd"
+    modloop_sign="no"
 }
 EOF
 
