@@ -13,3 +13,6 @@ client/configs/vps_ip.txt
 # Packer caches and plugins
 vps/packer/packer_cache/
 .packer/
+
+# Local compiled test binaries
+vps/bin/
