@@ -1,0 +1,31 @@
+#!/bin/bash
+set -e
+
+echo "=== Generating temporary packager signing keys ==="
+mkdir -p /root/.abuild
+abuild-keygen -a -n
+
+echo "=== Packaging myi2pd Amnesiac ISO ==="
+
+# Copy the compiled trusttunnel_client binary into the overlay usr/local/bin directory
+cp /usr/local/bin/trusttunnel_client /build/overlay/usr/local/bin/
+
+# Set execution permissions on overlay files
+chmod +x /build/overlay/usr/local/bin/*
+chmod +x /build/overlay/etc/init.d/*
+
+# Ensure runlevels directories exist in overlay
+mkdir -p /build/overlay/etc/runlevels/boot /build/overlay/etc/runlevels/default
+
+# Enable OpenRC services in the boot and default runlevels on the client
+ln -sf /etc/init.d/hdd-isolation /build/overlay/etc/runlevels/boot/hdd-isolation
+ln -sf /etc/init.d/dbus /build/overlay/etc/runlevels/default/dbus
+ln -sf /etc/init.d/seatd /build/overlay/etc/runlevels/default/seatd
+
+# Run Alpine image builder using our apkovl profile configuration
+sh mkimage.sh --profile myi2pd --repository https://dl-cdn.alpinelinux.org/alpine/edge/main --repository https://dl-cdn.alpinelinux.org/alpine/edge/community --outdir /build
+
+# Rename the generated ISO to the expected output filename
+mv /build/*.iso /build/myi2pd-amnesiac.iso
+
+echo "=== ISO built successfully! ==="

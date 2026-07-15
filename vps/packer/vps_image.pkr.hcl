@@ -17,7 +17,7 @@ variable "vultr_api_key" {
 
 source "vultr" "myi2pd_alpine" {
   api_key              = var.vultr_api_key
-  os_id                = 382 # Alpine Linux
+  os_id                = 2076 # Alpine Linux x64
   plan_id              = "vc2-1c-0.5gb" # Free Tier / low tier specs (1 vCPU, 512MB RAM)
   region_id            = "ewr" # Default region (New Jersey)
   snapshot_description = "myi2pd-hardened-alpine-vps"

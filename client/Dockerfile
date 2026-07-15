@@ -57,7 +57,9 @@ RUN apk add --no-cache \
     squashfs-tools \
     git \
     bash \
-    openssl
+    openssl \
+    grub \
+    grub-efi
 
 # Copy pre-compiled TrustTunnel client from builder standard location
 COPY --from=builder /usr/local/bin/trusttunnel_client /usr/local/bin/
@@ -82,64 +84,13 @@ RUN mkdir -p /build/overlay/etc/init.d \
              /build/overlay/usr/local/bin \
              /build/overlay/root
 
-# Configure the myi2pd ISO profile and the apkovl generator
-RUN cat <<'EOF' > mkimg.myi2pd.sh
-profile_myi2pd() {
-    profile_standard
-    name="myi2pd"
-    desc="Amnesiac TrustTunnel Network Gateway Client"
-    arch="x86_64"
-    kernel_flavors="virt"
-    # Bundles the offline packages directory on the ISO
-    apks="$apks nftables i2pd bash openssl wireless-tools wpa_supplicant e2fsprogs river fuzzel waybar foot font-dejavu seatd librewolf dbus mesa-dri-gallium udev util-linux util-linux-misc"
-    initfs_features="base ext4 squashfs kms network wireless"
-    apkovl="genapkovl-myi2pd.sh"
-    hostname="myi2pd"
-    modloop_sign="no"
-}
-EOF
+# Copy the myi2pd ISO profile configuration and the overlay packager script from static host configs
+COPY configs/mkimg.myi2pd.sh /usr/src/aports/scripts/mkimg.myi2pd.sh
+COPY configs/genapkovl-myi2pd.sh /usr/src/aports/scripts/genapkovl-myi2pd.sh
+RUN chmod +x /usr/src/aports/scripts/genapkovl-myi2pd.sh
 
-RUN cat <<'EOF' > genapkovl-myi2pd.sh
-#!/bin/sh
-set -e
-HOSTNAME="$1"
-
-# The structured overlay is located at /build/overlay
-# Create the apkovl tarball in the current directory (which is DESTDIR)
-tar -C /build/overlay -c -z -f "$HOSTNAME.apkovl.tar.gz" .
-EOF
-RUN chmod +x genapkovl-myi2pd.sh
-
-# Build execution script
-RUN cat <<'EOF' > /usr/local/bin/assemble-iso
-#!/bin/bash
-set -e
-
-echo "=== Packaging myi2pd Amnesiac ISO ==="
-
-# Copy the compiled trusttunnel_client binary into the overlay usr/local/bin directory
-cp /usr/local/bin/trusttunnel_client /build/overlay/usr/local/bin/
-
-# Set execution permissions on overlay files
-chmod +x /build/overlay/usr/local/bin/*
-chmod +x /build/overlay/etc/init.d/*
-
-# Ensure runlevels directories exist in overlay
-mkdir -p /build/overlay/etc/runlevels/boot /build/overlay/etc/runlevels/default
-
-# Enable OpenRC services in the boot and default runlevels on the client
-ln -sf /etc/init.d/hdd-isolation /build/overlay/etc/runlevels/boot/hdd-isolation
-ln -sf /etc/init.d/dbus /build/overlay/etc/runlevels/default/dbus
-ln -sf /etc/init.d/seatd /build/overlay/etc/runlevels/default/seatd
-
-# Run Alpine image builder using our apkovl profile configuration
-sh mkimage.sh --profile myi2pd --repository https://dl-cdn.alpinelinux.org/alpine/edge/main --repository https://dl-cdn.alpinelinux.org/alpine/edge/community --outdir /build
-
-# Rename the generated ISO to the expected output filename
-mv /build/*.iso /build/myi2pd-amnesiac.iso
-
-echo "=== ISO built successfully! ==="
-EOF
+# Copy the ISO packaging execution script
+COPY configs/assemble-iso /usr/local/bin/assemble-iso
 RUN chmod +x /usr/local/bin/assemble-iso
 
 CMD ["/usr/local/bin/assemble-iso"]
