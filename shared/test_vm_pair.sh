@@ -3,6 +3,24 @@
 
 set -e
 
+RUN_CLIENT=true
+RUN_SERVER=true
+
+for arg in "$@"; do
+    case $arg in
+        --server-only)
+            RUN_CLIENT=false
+            RUN_SERVER=true
+            ;;
+        --client-only)
+            RUN_CLIENT=true
+            RUN_SERVER=false
+            ;;
+        *)
+            ;;
+    esac
+done
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR/.."
 ISO_PATH="$PROJECT_ROOT/myi2pd-amnesiac.iso"
@@ -11,37 +29,40 @@ VPS_QCOW2="/tmp/myi2pd-vps.qcow2"
 CIDATA_DIR="/tmp/myi2pd_cidata_dir"
 CIDATA_ISO="/tmp/myi2pd_cidata.iso"
 
-echo "=== myi2pd QEMU Local VM Pair Tester ==="
+echo "=== myi2pd QEMU Local VM Tester ==="
 
 # 1. Verification checks
-if [ ! -f "$ISO_PATH" ]; then
-    echo "[ERROR] Client ISO not found at: $ISO_PATH. Please run ./client/build_iso.sh first."
-    exit 1
+if [ "$RUN_CLIENT" = true ]; then
+    if [ ! -f "$ISO_PATH" ]; then
+        echo "[ERROR] Client ISO not found at: $ISO_PATH. Please run ./client/build_iso.sh first."
+        exit 1
+    fi
 fi
 
-if [ ! -f "$PROJECT_ROOT/vps/bin/trusttunnel_endpoint" ]; then
-    echo "[ERROR] Compiled TrustTunnel host binaries not found."
-    exit 1
-fi
+if [ "$RUN_SERVER" = true ]; then
+    if [ ! -f "$PROJECT_ROOT/vps/bin/trusttunnel_endpoint" ]; then
+        echo "[ERROR] Compiled TrustTunnel host binaries not found."
+        exit 1
+    fi
 
-# 2. Download Alpine Cloud Base Image if not present (~18 MB)
-if [ ! -f "$BASE_QCOW2" ]; then
-    echo "Downloading Alpine Cloud Base QCOW2 image..."
-    curl -sSL "https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/cloud/nocloud_alpine-3.20.9-x86_64-bios-tiny-r0.qcow2" -o "$BASE_QCOW2"
-fi
+    # 2. Download Alpine Cloud Base Image if not present (~18 MB)
+    if [ ! -f "$BASE_QCOW2" ]; then
+        echo "Downloading Alpine Cloud Base QCOW2 image..."
+        curl -sSL "https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/cloud/nocloud_alpine-3.20.9-x86_64-bios-tiny-r0.qcow2" -o "$BASE_QCOW2"
+    fi
 
-# 3. Create fresh copy of VPS QCOW2 disk
-echo "Creating fresh copy of VPS guest disk..."
-cp "$BASE_QCOW2" "$VPS_QCOW2"
+    # 3. Create fresh copy of VPS QCOW2 disk
+    echo "Creating fresh copy of VPS guest disk..."
+    cp "$BASE_QCOW2" "$VPS_QCOW2"
 
-# 4. Prepare CIDATA folder
-echo "Preparing automated cloud-init metadata..."
-rm -rf "$CIDATA_DIR"
-mkdir -p "$CIDATA_DIR/bin" "$CIDATA_DIR/vps"
+    # 4. Prepare CIDATA folder
+    echo "Preparing automated cloud-init metadata..."
+    rm -rf "$CIDATA_DIR"
+    mkdir -p "$CIDATA_DIR/bin" "$CIDATA_DIR/vps"
 
-# Copy binaries and vps folder
-cp "$PROJECT_ROOT/vps/bin/trusttunnel_endpoint" "$CIDATA_DIR/bin/"
-cp "$PROJECT_ROOT/vps/bin/setup_wizard" "$CIDATA_DIR/bin/"
+    # Copy binaries and vps folder
+    cp "$PROJECT_ROOT/vps/bin/trusttunnel_endpoint" "$CIDATA_DIR/bin/"
+    cp "$PROJECT_ROOT/vps/bin/setup_wizard" "$CIDATA_DIR/bin/"
 cp -r "$PROJECT_ROOT/vps/configs" "$CIDATA_DIR/vps/"
 cp -r "$PROJECT_ROOT/vps/scripts" "$CIDATA_DIR/vps/"
 
@@ -102,14 +123,6 @@ rc-service trusttunnel start || true
 echo "=== Local VPS Gateway VM is Ready! ==="
 EOF
 
-# 5. Package CIDATA ISO
-echo "Packaging CIDATA configuration ISO..."
-rm -f "$CIDATA_ISO"
-xorriso -as mkisofs -o "$CIDATA_ISO" -V CIDATA -J -r "$CIDATA_DIR"
-
-# 6. Launch QEMU VMs
-echo "Launching QEMU VMs..."
-
 # Detect KVM availability
 ACCEL_ARGS=("-cpu" "qemu64")
 if [ -w /dev/kvm ]; then
@@ -117,39 +130,75 @@ if [ -w /dev/kvm ]; then
     ACCEL_ARGS=("-enable-kvm" "-cpu" "host")
 fi
 
-# Launch VM 2 (VPS Gateway) in the background
-echo "Starting VPS Gateway VM (QEMU 1)..."
-qemu-system-x86_64 \
-    "${ACCEL_ARGS[@]}" \
-    -m 1G \
-    -drive file="$VPS_QCOW2",format=qcow2 \
-    -cdrom "$CIDATA_ISO" \
-    -netdev user,id=net0 -device virtio-net-pci,netdev=net0 \
-    -netdev socket,id=net1,listen=:12345 -device virtio-net-pci,netdev=net1 \
-    -device virtio-vga-gl -display sdl,gl=on &
-VPS_PID=$!
+VPS_PID=""
 
-# Wait 5 seconds for the socket to bind and start listening
-sleep 5
+if [ "$RUN_SERVER" = true ]; then
+    # 5. Package CIDATA ISO
+    echo "Packaging CIDATA configuration ISO..."
+    rm -f "$CIDATA_ISO"
+    xorriso -as mkisofs -o "$CIDATA_ISO" -V CIDATA -J -r "$CIDATA_DIR"
 
-# Launch VM 1 (Client Amnesiac OS)
-echo "Starting Amnesiac Client ISO VM (QEMU 2)..."
-qemu-system-x86_64 \
-    "${ACCEL_ARGS[@]}" \
-    -m 1G \
-    -cdrom "$ISO_PATH" \
-    -boot d \
-    -netdev socket,id=net0,connect=127.0.0.1:12345 -device virtio-net-pci,netdev=net0 \
-    -device virtio-vga-gl -display sdl,gl=on
+    # Launch VM 2 (VPS Gateway)
+    if [ "$RUN_CLIENT" = true ]; then
+        echo "Starting VPS Gateway VM in background (QEMU 1)..."
+        qemu-system-x86_64 \
+            "${ACCEL_ARGS[@]}" \
+            -m 1G \
+            -drive file="$VPS_QCOW2",format=qcow2 \
+            -cdrom "$CIDATA_ISO" \
+            -netdev user,id=net0 -device virtio-net-pci,netdev=net0 \
+            -netdev socket,id=net1,listen=:12345 -device virtio-net-pci,netdev=net1 \
+            -device virtio-vga-gl -display sdl,gl=on &
+        VPS_PID=$!
+        
+        # Wait 5 seconds for the socket to bind and start listening
+        sleep 5
+    else
+        echo "Starting VPS Gateway VM in foreground (QEMU 1)..."
+        qemu-system-x86_64 \
+            "${ACCEL_ARGS[@]}" \
+            -m 1G \
+            -drive file="$VPS_QCOW2",format=qcow2 \
+            -cdrom "$CIDATA_ISO" \
+            -netdev user,id=net0 -device virtio-net-pci,netdev=net0 \
+            -netdev socket,id=net1,listen=:12345 -device virtio-net-pci,netdev=net1 \
+            -device virtio-vga-gl -display sdl,gl=on
+    fi
+fi
 
-# Once Client VM exits, terminate the background VPS VM
-echo "Terminating VPS Gateway VM (PID: $VPS_PID)..."
-kill -9 "$VPS_PID" || true
+if [ "$RUN_CLIENT" = true ]; then
+    echo "Starting Amnesiac Client ISO VM (QEMU 2)..."
+    if [ "$RUN_SERVER" = true ]; then
+        # Connect to private socket network
+        qemu-system-x86_64 \
+            "${ACCEL_ARGS[@]}" \
+            -m 1G \
+            -cdrom "$ISO_PATH" \
+            -boot d \
+            -netdev socket,id=net0,connect=127.0.0.1:12345 -device virtio-net-pci,netdev=net0 \
+            -device virtio-vga-gl -display sdl,gl=on
+    else
+        # Standalone client boot (no server network connection)
+        qemu-system-x86_64 \
+            "${ACCEL_ARGS[@]}" \
+            -m 1G \
+            -cdrom "$ISO_PATH" \
+            -boot d \
+            -device virtio-vga-gl -display sdl,gl=on
+    fi
+fi
 
-# Cleanup temporary files to conserve space
-echo "Cleaning up temporary VM files..."
-rm -rf "$CIDATA_DIR"
-rm -f "$CIDATA_ISO"
-rm -f "$VPS_QCOW2"
+# Post-execution cleanup
+if [ -n "$VPS_PID" ]; then
+    echo "Terminating background VPS Gateway VM (PID: $VPS_PID)..."
+    kill -9 "$VPS_PID" || true
+fi
+
+if [ "$RUN_SERVER" = true ]; then
+    echo "Cleaning up temporary VM files..."
+    rm -rf "$CIDATA_DIR"
+    rm -f "$CIDATA_ISO"
+    rm -f "$VPS_QCOW2"
+fi
 
 echo "=== Local testing session ended successfully! ==="

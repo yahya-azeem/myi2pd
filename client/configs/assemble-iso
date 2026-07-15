@@ -4,6 +4,7 @@ set -e
 echo "=== Generating temporary packager signing keys ==="
 mkdir -p /root/.abuild
 abuild-keygen -a -n
+cp /root/.abuild/*.pub /etc/apk/keys/
 
 echo "=== Packaging myi2pd Amnesiac ISO ==="
 
