@@ -27,7 +27,7 @@ fi
 # 2. Download Alpine Cloud Base Image if not present (~18 MB)
 if [ ! -f "$BASE_QCOW2" ]; then
     echo "Downloading Alpine Cloud Base QCOW2 image..."
-    curl -sSL "https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/x86_64/alpine-cloud-3.20.3-x86_64-bios-tiny-r0.qcow2" -o "$BASE_QCOW2"
+    curl -sSL "https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/cloud/nocloud_alpine-3.20.9-x86_64-bios-tiny-r0.qcow2" -o "$BASE_QCOW2"
 fi
 
 # 3. Create fresh copy of VPS QCOW2 disk
@@ -51,60 +51,55 @@ instance-id: myi2pd-vps-local-test
 local-hostname: myi2pd-gateway
 EOF
 
-# Write user-data containing setup and interface configuration
+# Write user-data containing setup and interface configuration (Pure shell script for Tiny Cloud)
 cat <<'EOF' > "$CIDATA_DIR/user-data"
-#cloud-config
-write_files:
-  - path: /etc/udhcpd.conf
-    permissions: '0644'
-    content: |
-      start 10.10.10.10
-      end 10.10.10.20
-      interface eth1
-      option subnet 255.255.255.0
-      option router 10.10.10.1
-      option dns 1.1.1.1
-  - path: /root/run_setup.sh
-    permissions: '0755'
-    content: |
-      #!/bin/sh
-      set -e
-      echo "=== Starting Automated Local VPS Gateway Setup ==="
-      # 1. Mount the CIDATA CD-ROM (usually /dev/sr0)
-      mkdir -p /mnt/cidata
-      mount /dev/sr0 /mnt/cidata || mount /dev/cdrom /mnt/cidata
-      
-      # 2. Copy configurations and binaries
-      mkdir -p /etc/myi2pd-configs
-      cp -r /mnt/cidata/vps/configs/* /etc/myi2pd-configs/
-      cp /mnt/cidata/bin/trusttunnel_endpoint /usr/local/bin/
-      cp /mnt/cidata/bin/setup_wizard /usr/local/bin/
-      chmod +x /usr/local/bin/*
-      
-      # 3. Configure local networking on private eth1 interface
-      ip addr add 10.10.10.1/24 dev eth1 || true
-      ip link set eth1 up
-      
-      # 4. Start local DHCP server for Client VM auto-IP assignment
-      touch /var/lib/misc/udhcpd.leases
-      udhcpd /etc/udhcpd.conf
-      
-      # 5. Execute setup_vps.sh to configure nftables and i2pd
-      cp /mnt/cidata/vps/scripts/setup_vps.sh /tmp/setup_vps.sh
-      chmod +x /tmp/setup_vps.sh
-      /tmp/setup_vps.sh
-      
-      # Start services manually in memory
-      rc-update add nftables default
-      rc-update add i2pd default
-      rc-update add trusttunnel default
-      rc-service nftables start || true
-      rc-service i2pd start || true
-      rc-service trusttunnel start || true
-      
-      echo "=== Local VPS Gateway VM is Ready! ==="
-runcmd:
-  - /root/run_setup.sh
+#!/bin/sh
+set -e
+echo "=== Starting Automated Local VPS Gateway Setup ==="
+
+# 1. Mount the CIDATA CD-ROM (usually /dev/sr0)
+mkdir -p /mnt/cidata
+mount /dev/sr0 /mnt/cidata || mount /dev/cdrom /mnt/cidata
+
+# 2. Copy configurations and binaries
+mkdir -p /etc/myi2pd-configs
+cp -r /mnt/cidata/vps/configs/* /etc/myi2pd-configs/
+cp /mnt/cidata/bin/trusttunnel_endpoint /usr/local/bin/
+cp /mnt/cidata/bin/setup_wizard /usr/local/bin/
+chmod +x /usr/local/bin/*
+
+# 3. Create udhcpd configuration
+cat <<CONF > /etc/udhcpd.conf
+start 10.10.10.10
+end 10.10.10.20
+interface eth1
+option subnet 255.255.255.0
+option router 10.10.10.1
+option dns 1.1.1.1
+CONF
+
+# 4. Configure local networking on private eth1 interface
+ip addr add 10.10.10.1/24 dev eth1 || true
+ip link set eth1 up
+
+# 5. Start local DHCP server for Client VM auto-IP assignment
+touch /var/lib/misc/udhcpd.leases
+udhcpd /etc/udhcpd.conf
+
+# 6. Execute setup_vps.sh to configure nftables and i2pd
+cp /mnt/cidata/vps/scripts/setup_vps.sh /tmp/setup_vps.sh
+chmod +x /tmp/setup_vps.sh
+/tmp/setup_vps.sh
+
+# Start services manually in memory
+rc-update add nftables default
+rc-update add i2pd default
+rc-update add trusttunnel default
+rc-service nftables start || true
+rc-service i2pd start || true
+rc-service trusttunnel start || true
+
+echo "=== Local VPS Gateway VM is Ready! ==="
 EOF
 
 # 5. Package CIDATA ISO
