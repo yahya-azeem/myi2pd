@@ -10,4 +10,6 @@ profile_myi2pd() {
     apkovl="genapkovl-myi2pd.sh"
     hostname="myi2pd"
     modloop_sign="no"
+    syslinux_timeout=1
+    grub_timeout=0
 }

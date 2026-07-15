@@ -120,8 +120,8 @@ rc-service nftables start || true
 rc-service i2pd start || true
 rc-service trusttunnel start || true
 
-echo "=== Local VPS Gateway VM is Ready! ==="
 EOF
+fi
 
 # Detect KVM availability
 ACCEL_ARGS=("-cpu" "qemu64")
