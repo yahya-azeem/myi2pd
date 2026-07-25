@@ -1,20 +1,4 @@
-# root/.profile - Auto-starts River dynamic tiling compositor on login from virtual tty1
+[ -f /etc/profile ] && . /etc/profile
 
-if [ -f /etc/profile ]; then
-    . /etc/profile
-fi
-
-# Check if logged in on virtual terminal tty1
-if [ "$(tty)" = "/dev/tty1" ]; then
-    echo "Starting graphical environment (River Composer)..."
-    # Configure required XDG Wayland runtime environment variables
-    if [ -z "$XDG_RUNTIME_DIR" ]; then
-        export XDG_RUNTIME_DIR=/tmp/runtime-root
-        mkdir -p "$XDG_RUNTIME_DIR"
-        chmod 0700 "$XDG_RUNTIME_DIR"
-    fi
-    # Ensure seatd is running for device permissions management
-    rc-service seatd start || true
-    # Launch River
-    exec seatd-launch river
-fi
+TTY=$(tty)
+echo "myi2pd profile running on $TTY" > /dev/ttyS0 2>/dev/null

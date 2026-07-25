@@ -1,13 +1,10 @@
-# /etc/inittab - Custom inittab for myi2pd automatic console autologin
-
 ::sysinit:/sbin/openrc sysinit
 ::sysinit:/sbin/openrc boot
-::single:/sbin/openrc single
+::wait:/sbin/openrc default
 
-# Run console autologin wrapper on tty1 instead of standard login prompting getty
-tty1::respawn:/sbin/getty -n -l /usr/local/bin/autologin 38400 tty1
+tty1::respawn:/sbin/getty -n -l /usr/local/bin/start-river 38400 tty1
+ttyS0::respawn:/sbin/agetty --autologin root 38400 ttyS0
 
-# Keep remaining terminals standard for safety
 tty2::respawn:/sbin/getty 38400 tty2
 tty3::respawn:/sbin/getty 38400 tty3
 tty4::respawn:/sbin/getty 38400 tty4

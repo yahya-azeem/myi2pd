@@ -30,7 +30,7 @@ sysctl -p /etc/sysctl.d/ipv4.conf || true
 echo "Configuring nftables whitelist firewall..."
 # Copy configuration to standard location
 cp /etc/myi2pd-configs/nftables.nft /etc/nftables.nft
-rc-update add nftables default
+rc-update add nftables default || true
 
 # 4. Install and Tune i2pd (low resource constraints)
 echo "Installing and tuning i2pd daemon..."
@@ -47,24 +47,24 @@ chown i2pd:i2pd /etc/i2pd/i2pd.conf
 rc-update add i2pd default
 
 # 5. Build and Configure TrustTunnel Server
-echo "Installing compiler toolchain and building TrustTunnel..."
-apk add build-base git rust cargo openssl-dev cmake clang-dev llvm-dev
+if [ ! -x /usr/local/bin/trusttunnel_endpoint ] || [ ! -x /usr/local/bin/setup_wizard ]; then
+    echo "Building TrustTunnel from source (binaries not found)..."
+    apk add build-base git rust cargo openssl-dev cmake clang-dev llvm-dev
 
-# Clone and compile
-git clone --depth 1 https://github.com/TrustTunnel/TrustTunnel.git /tmp/trusttunnel-build
-cd /tmp/trusttunnel-build
-cargo build --release --bins
+    git clone --depth 1 https://github.com/TrustTunnel/TrustTunnel.git /tmp/trusttunnel-build
+    cd /tmp/trusttunnel-build
+    cargo build --release --bins
 
-# Install binaries
-cp target/release/trusttunnel_endpoint /usr/local/bin/
-cp target/release/setup_wizard /usr/local/bin/
+    cp target/release/trusttunnel_endpoint /usr/local/bin/
+    cp target/release/setup_wizard /usr/local/bin/
 
-# Clean up build dependencies to conserve space
-echo "Cleaning up compiler build tools to free disk space..."
-cd /
-rm -rf /tmp/trusttunnel-build
-apk del build-base git rust cargo clang-dev llvm-dev
-apk add openssl libgcc libstdc++ # ensure runtime libraries are present
+    cd /
+    rm -rf /tmp/trusttunnel-build
+    apk del build-base git rust cargo clang-dev llvm-dev
+    apk add openssl libgcc libstdc++
+else
+    echo "TrustTunnel binaries already present, skipping build..."
+fi
 
 # Generate self-signed TLS certificates
 echo "Generating self-signed TLS certificates..."

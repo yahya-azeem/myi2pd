@@ -1,18 +1,7 @@
-# Binary ISO Boot Images
 *.iso
-
-# Local configuration dynamic variables
-client/configs/vps_ip.txt
-
-# Terraform local state and modules
-*.tfstate
-*.tfstate.*
-.terraform/
-.terraform.lock.hcl
-
-# Packer caches and plugins
-vps/packer/packer_cache/
-.packer/
-
-# Local compiled test binaries
-vps/bin/
+*.img
+overlay-tmp/
+out/
+__pycache__/
+*.pyc
+.DS_Store

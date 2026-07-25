@@ -15,6 +15,10 @@ table inet filter {
         # Dedicated static I2P network routing port
         tcp dport 25432 accept
         udp dport 25432 accept
+
+        # i2pd proxy ports accessible from TrustTunnel VPN clients
+        iifname "tun+" tcp dport 4444 accept
+        iifname "tun+" tcp dport 4447 accept
     }
 
     chain forward {
@@ -36,7 +40,7 @@ table ip nat {
     chain postrouting {
         type nat hook postrouting priority 100; policy accept;
 
-        # Masquerade traffic from the VPN subnet (10.0.0.0/24) out to the WAN
-        ip saddr 10.0.0.0/24 masquerade
+        # Masquerade traffic from the VPN subnet (10.10.10.0/24) out to the WAN
+        ip saddr 10.10.10.0/24 masquerade
     }
 }

@@ -1,0 +1,161 @@
+name: Build myi2pd ISOs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU (for binfmt)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build client builder image
+        uses: docker/build-push-action@v6
+        with:
+          context: client
+          file: client/Dockerfile
+          tags: myi2pd-builder:latest
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Create overlay directories
+        run: |
+          mkdir -p client/overlay-tmp/etc/init.d \
+                   client/overlay-tmp/etc/runlevels/boot \
+                   client/overlay-tmp/etc/runlevels/default \
+                   client/overlay-tmp/etc/nftables \
+                   client/overlay-tmp/etc/librewolf \
+                   client/overlay-tmp/etc/river \
+                   client/overlay-tmp/etc/xdg/waybar \
+                   client/overlay-tmp/etc/wallpaper \
+                   client/overlay-tmp/etc/trusttunnel \
+                   client/overlay-tmp/usr/local/bin \
+                   client/overlay-tmp/usr/share/fonts/SauceCodePro \
+                   client/overlay-tmp/root
+
+      - name: Copy configs to overlay
+        run: |
+          cp client/configs/inittab client/overlay-tmp/etc/inittab
+          cp client/configs/river_init client/overlay-tmp/etc/river/init
+          cp client/configs/start-river client/overlay-tmp/usr/local/bin/start-river
+          cp client/configs/foot.ini client/overlay-tmp/etc/foot.ini
+          cp client/configs/waybar_config.jsonc client/overlay-tmp/etc/xdg/waybar/config.jsonc
+          cp client/configs/waybar_style.css client/overlay-tmp/etc/xdg/waybar/style.css
+          cp client/configs/nftables.nft client/overlay-tmp/etc/nftables/nftables.nft
+          cp client/configs/policies.json client/overlay-tmp/etc/librewolf/policies.json
+          cp client/configs/librewolf.overrides.cfg client/overlay-tmp/etc/librewolf/librewolf.overrides.cfg
+          cp client/configs/neofetch-wrapper client/overlay-tmp/usr/local/bin/neofetch
+          cp client/configs/neomutt-i2p.sh client/overlay-tmp/usr/local/bin/neomutt-i2p
+          cp client/configs/wifi-connect.sh client/overlay-tmp/usr/local/bin/wifi-connect.sh
+          cp client/configs/os-release client/overlay-tmp/etc/os-release
+          cp client/configs/vps_ip.txt client/overlay-tmp/etc/trusttunnel/vps_ip.txt
+          cp client/wallpaper/wallpaper.avif client/overlay-tmp/etc/wallpaper/wallpaper.avif
+          cp -r client/fonts/* client/overlay-tmp/usr/share/fonts/SauceCodePro/
+          cp -r client/extensions/* client/overlay-tmp/usr/lib/librewolf/distribution/extensions/
+          chmod +x client/overlay-tmp/usr/local/bin/*
+
+      - name: Build client ISO
+        run: |
+          mkdir -p client/out
+          docker run --rm --privileged \
+            --tmpfs /tmp:size=4G \
+            -v "$(pwd)/client/overlay-tmp:/build/overlay" \
+            -v "$(pwd)/client/out:/build" \
+            myi2pd-builder:latest
+
+      - name: Rename and upload client ISO
+        run: mv client/out/myi2pd-amnesiac.iso myi2pd-amnesiac.iso
+        continue-on-error: true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: myi2pd-amnesiac
+          path: myi2pd-amnesiac.iso
+
+  build-vps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build VPS builder image
+        uses: docker/build-push-action@v6
+        with:
+          context: vps
+          file: vps/vps-builder.Dockerfile
+          tags: myi2pd-builder:vps
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Create VPS overlay
+        run: |
+          mkdir -p vps/overlay-tmp/etc/init.d \
+                   vps/overlay-tmp/etc/runlevels/boot \
+                   vps/overlay-tmp/etc/runlevels/default \
+                   vps/overlay-tmp/etc/i2pd \
+                   vps/overlay-tmp/etc/network \
+                   vps/overlay-tmp/usr/local/bin \
+                   vps/overlay-tmp/root \
+                   vps/overlay-tmp/var/lib/i2pd/netDb
+          chmod 0755 vps/overlay-tmp/var/lib/i2pd
+          chmod 0755 vps/overlay-tmp/var/lib/i2pd/netDb
+
+      - name: Copy VPS configs to overlay
+        run: |
+          cp vps/configs/i2pd.conf vps/overlay-tmp/etc/i2pd/i2pd.conf
+          cp vps/configs/nftables.nft vps/overlay-tmp/etc/nftables.nft
+          cp vps/netDb/* vps/overlay-tmp/var/lib/i2pd/netDb/
+
+      - name: Build VPS ISO
+        run: |
+          mkdir -p vps/out
+          docker run --rm --privileged \
+            --tmpfs /tmp:size=4G \
+            -v "$(pwd)/vps/overlay-tmp:/build/overlay" \
+            -v "$(pwd)/vps/out:/build" \
+            -v "$(pwd)/vps/configs/mkimg.myi2pd-vps.sh:/usr/src/aports/scripts/mkimg.myi2pd-vps.sh" \
+            -v "$(pwd)/vps/configs/genapkovl-myi2pd-vps.sh:/usr/src/aports/scripts/genapkovl-myi2pd-vps.sh" \
+            -v "$(pwd)/vps/configs/assemble-vps-iso:/usr/src/aports/scripts/assemble-vps-iso" \
+            myi2pd-builder:vps sh -c '
+              set -e
+              if [ ! -f /root/.abuild/abuild.conf ]; then
+                  mkdir -p /root/.abuild
+                  abuild-keygen -a -n
+                  cp /root/.abuild/*.pub /etc/apk/keys/
+              fi
+              mkdir -p /build/overlay/etc/runlevels/boot /build/overlay/etc/runlevels/default
+              chmod +x /build/overlay/etc/init.d/* 2>/dev/null || true
+              sh /usr/src/aports/scripts/assemble-vps-iso
+              cd /usr/src/aports/scripts
+              sh mkimage.sh --profile myi2pd-vps \
+                --repository https://dl-cdn.alpinelinux.org/alpine/edge/main \
+                --repository https://dl-cdn.alpinelinux.org/alpine/edge/community \
+                --outdir /build --hostkeys
+              rm -f /build/myi2pd-vps.iso
+              for f in /build/*.iso; do
+                  [ -f "$f" ] && mv "$f" /build/myi2pd-vps.iso && break
+              done
+            '
+
+      - name: Rename and upload VPS ISO
+        run: mv vps/out/myi2pd-vps.iso myi2pd-vps.iso
+        continue-on-error: true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: myi2pd-vps
+          path: myi2pd-vps.iso

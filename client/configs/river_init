@@ -1,33 +1,108 @@
 #!/bin/sh
-# myi2pd River Compositor Init Configuration
-
-# Set the modifier key to Super (Windows Key)
+# Adapted from soliprem/river-rice (MIT) for myi2pd amnesiac client ISO
 MOD="Mod4"
 
-# --- Hardcoded Shortkeys ---
-# Super + B: Launch Hardened LibreWolf
-riverctl map normal $MOD B spawn "librewolf-launcher"
+# -- Theme Colors --
+riverctl background-color 0x0e1218
+riverctl border-color-focused 0xcc8a5e
+riverctl border-color-unfocused 0x1f2937
+riverctl border-color-urgent 0xe5534b
+riverctl border-width 3
 
-# Super + D: Launch Application Menu (Fuzzel)
-riverctl map normal $MOD D spawn "fuzzel --dmenu"
-
-# Super + Return: Open foot terminal
-riverctl map normal $MOD Return spawn "foot"
-
-# Super + Q: Close active window
-riverctl map normal $MOD Q close
-
-# Super + Shift + E: Exit River compositor (log out of GUI)
-riverctl map normal $MOD Shift E exit
-
-# --- Window Layout and Tiling Rules ---
-# Default to layout tile
+# -- Default Layout --
 riverctl default-layout rivertile
 riverctl spawn "rivertile -view-padding 4 -outer-padding 4"
 
-# --- Startup Applications ---
-# Start Waybar status panel
-waybar &
+# -- Terminal --
+riverctl map normal $MOD Return spawn "foot"
 
-# Auto-spawn the interactive Wi-Fi connection wizard inside a foot terminal window on bootup
-foot -T "myi2pd Wi-Fi Connection Setup" /usr/local/bin/wifi-connect.sh &
+# -- App Launcher --
+riverctl map normal $MOD D spawn "fuzzel"
+
+# -- LibreWolf Browser --
+riverctl map normal $MOD B spawn "librewolf-launcher"
+
+# -- aria2c (I2P-routed torrent CLI) --
+riverctl map normal $MOD T spawn "foot aria2c"
+
+# -- NeoMutt (I2P-routed email) --
+riverctl map normal $MOD M spawn "foot neomutt-i2p"
+
+# -- Neofetch (system info in terminal) --
+riverctl map normal $MOD N spawn "foot neofetch"
+
+# -- Navigation (hjkl / vi-style) --
+riverctl map normal $MOD J focus-view next
+riverctl map normal $MOD K focus-view previous
+riverctl map normal $MOD H send-layout-cmd rivertile "main-ratio -0.05"
+riverctl map normal $MOD L send-layout-cmd rivertile "main-ratio +0.05"
+
+# -- Directional movement --
+riverctl map normal $MOD+Mod1 J move up
+riverctl map normal $MOD+Mod1 K move down
+riverctl map normal $MOD+Mod1 H move left
+riverctl map normal $MOD+Mod1 L move right
+
+# -- Directional focus --
+riverctl map normal $MOD+Control J focus-output next
+riverctl map normal $MOD+Control K focus-output previous
+
+# -- Tags 1-9 --
+for i in $(seq 1 9); do
+    tags=$((1 << (i - 1)))
+    riverctl map normal $MOD "$i" set-focused-tags "$tags"
+    riverctl map normal $MOD+Shift "$i" set-view-tags "$tags"
+    riverctl map normal $MOD+Control "$i" toggle-focused-tags "$tags"
+done
+
+# -- Tag 0 (all tags) --
+riverctl map normal $MOD 0 set-focused-tags 511
+riverctl map normal $MOD+Shift 0 set-view-tags 511
+
+# -- Window Management --
+riverctl map normal $MOD Q close
+riverctl map normal $MOD Space toggle-float
+riverctl map normal $MOD F toggle-fullscreen
+riverctl map normal $MOD+Shift Return zoom
+
+# -- Layout Control --
+riverctl map normal $MOD Period send-layout-cmd rivertile "main-location next"
+riverctl map normal $MOD Comma send-layout-cmd rivertile "main-count +1"
+riverctl map normal $MOD Shift Period send-layout-cmd rivertile "main-count -1"
+
+# -- Pointer mappings --
+riverctl map-pointer normal $MOD BTN_LEFT move-view
+riverctl map-pointer normal $MOD BTN_MIDDLE toggle-float
+riverctl map-pointer normal $MOD BTN_RIGHT resize-view
+
+# -- Exit / Logout --
+riverctl map normal $MOD+Shift E exit
+
+# -- WiFi Setup --
+riverctl map normal $MOD W spawn "foot -T 'myi2pd Wi-Fi Connection Setup' /usr/local/bin/wifi-connect.sh"
+
+# -- Wallpaper --
+if [ -f /etc/wallpaper/wallpaper.avif ]; then
+    swaybg -i /etc/wallpaper/wallpaper.avif -m fill >/dev/null 2>&1 &
+else
+    swaybg -c '#0e1218' &
+fi
+
+# -- Startup --
+waybar -c /etc/xdg/waybar/config.jsonc -s /etc/xdg/waybar/style.css >/tmp/waybar.log 2>&1 &
+foot &
+
+# Auto-launch LibreWolf after TrustTunnel connects
+(sleep 8
+ if [ -f /etc/trusttunnel/vps_ip.txt ]; then
+     for i in $(seq 1 15); do
+         ip link show dev tun0 >/dev/null 2>&1 && break
+         sleep 1
+     done
+ fi
+ export PATH="/usr/local/bin:$PATH"
+ echo "[myi2pd] launching LibreWolf..." > /dev/ttyS0 2>/dev/null
+ /usr/local/bin/librewolf-launcher http://i2p-projekt.i2p >/tmp/librewolf.log 2>&1
+ rc=$?
+ echo "[myi2pd] LibreWolf exited: $rc" > /dev/ttyS0 2>/dev/null
+) &

@@ -1,0 +1,127 @@
+#!/bin/bash
+set -e
+
+if [ ! -f /root/.abuild/abuild.conf ]; then
+    echo "=== Generating temporary packager signing keys ==="
+    mkdir -p /root/.abuild
+    abuild-keygen -a -n
+    cp /root/.abuild/*.pub /etc/apk/keys/
+fi
+
+echo "=== Packaging myi2pd VPS Gateway ISO ==="
+
+# Copy binaries
+cp /usr/local/bin/trusttunnel_endpoint /build/overlay/usr/local/bin/
+cp /usr/local/bin/setup_wizard /build/overlay/usr/local/bin/
+
+# Set execution permissions
+chmod +x /build/overlay/usr/local/bin/*
+chmod +x /build/overlay/etc/init.d/*
+
+# Ensure runlevels directories exist
+mkdir -p /build/overlay/etc/runlevels/boot /build/overlay/etc/runlevels/default
+
+# Copy i2pd config
+mkdir -p /build/overlay/etc/i2pd
+cp /build/overlay/etc/i2pd/i2pd.conf /build/overlay/etc/i2pd/i2pd.conf
+
+# Copy nftables config
+cp /build/overlay/etc/nftables.nft /build/overlay/etc/nftables.nft
+
+# Create trusttunnel init script
+cat > /build/overlay/etc/init.d/trusttunnel << 'INITEOF'
+#!/sbin/openrc-run
+name="trusttunnel"
+description="TrustTunnel VPN Endpoint Daemon"
+command="/usr/local/bin/trusttunnel_endpoint"
+command_args="/etc/trusttunnel/vpn.toml /etc/trusttunnel/hosts.toml"
+command_background=true
+pidfile="/run/RC_SVCNAME.pid"
+depend() { need net; after nftables; }
+start_pre() {
+    [ -d /etc/trusttunnel ] || mkdir -p /etc/trusttunnel
+    [ -f /etc/trusttunnel/server.crt ] || openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/trusttunnel/server.key -out /etc/trusttunnel/server.crt -subj "/CN=10.10.10.1" 2>/dev/null
+    [ -f /etc/trusttunnel/hosts.toml ] || cat > /etc/trusttunnel/hosts.toml << TOMLEOF
+[[main_hosts]]
+hostname = "10.10.10.1"
+cert_chain_path = "/etc/trusttunnel/server.crt"
+private_key_path = "/etc/trusttunnel/server.key"
+TOMLEOF
+    [ -f /etc/trusttunnel/vpn.toml ] || setup_wizard -m non-interactive -a 0.0.0.0:443 -c "myi2pduser:myi2pdsecurepassword" -n "10.10.10.1" --lib-settings /etc/trusttunnel/vpn.toml --hosts-settings /etc/trusttunnel/hosts.toml --client-settings /etc/trusttunnel/client.toml 2>/dev/null || true
+}
+INITEOF
+chmod +x /build/overlay/etc/init.d/trusttunnel
+
+# Create eth1-lan init script
+cat > /build/overlay/etc/init.d/eth1-lan << 'LANEOF'
+#!/sbin/openrc-run
+description="Private LAN interface for client VMs"
+depend() { need net; }
+start() {
+    ebegin "Setting up eth1 private LAN"
+    ip addr add 10.10.10.1/24 dev eth1 2>/dev/null || true
+    ip link set eth1 up
+    eend 0
+}
+LANEOF
+chmod +x /build/overlay/etc/init.d/eth1-lan
+
+# Create /root/.profile
+cat > /build/overlay/root/.profile << 'PROFEOF'
+#!/bin/sh
+echo "=== myi2pd VPS Gateway ==="
+echo "i2pd status: $(rc-service i2pd status 2>/dev/null | grep -o 'started\|stopped' || echo 'unknown')"
+echo "trusttunnel status: $(rc-service trusttunnel status 2>/dev/null | grep -o 'started\|stopped' || echo 'unknown')"
+echo "eth0: $(ip -4 addr show eth0 2>/dev/null | grep -oP 'inet \K[0-9.]+')"
+echo "eth1: $(ip -4 addr show eth1 2>/dev/null | grep -oP 'inet \K[0-9.]+')"
+PROFEOF
+
+# Enable services in runlevels
+ln -sf /etc/init.d/hostname /build/overlay/etc/runlevels/boot/hostname
+ln -sf /etc/init.d/udev /build/overlay/etc/runlevels/boot/udev
+ln -sf /etc/init.d/eth1-lan /build/overlay/etc/runlevels/boot/eth1-lan
+ln -sf /etc/init.d/networking /build/overlay/etc/runlevels/default/networking
+ln -sf /etc/init.d/nftables /build/overlay/etc/runlevels/default/nftables
+ln -sf /etc/init.d/i2pd /build/overlay/etc/runlevels/default/i2pd
+ln -sf /etc/init.d/trusttunnel /build/overlay/etc/runlevels/default/trusttunnel
+ln -sf /etc/init.d/dnsmasq /build/overlay/etc/runlevels/default/dnsmasq
+
+# dnsmasq config for eth1 LAN
+cat > /build/overlay/etc/dnsmasq.conf << 'DNSEOF'
+interface=eth1
+dhcp-range=10.10.10.10,10.10.10.20,255.255.255.0,12h
+dhcp-option=3,10.10.10.1
+dhcp-option=6,1.1.1.1
+DNSEOF
+
+# hostname
+echo "myi2pd-gateway" > /build/overlay/etc/hostname
+
+# network interfaces
+cat > /build/overlay/etc/network/interfaces << 'INTFEOF'
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet dhcp
+INTFEOF
+
+# Copy profile and genapkovl scripts to aports location
+cp /vps/configs/mkimg.myi2pd-vps.sh /usr/src/aports/scripts/mkimg.myi2pd-vps.sh
+cp /vps/configs/genapkovl-myi2pd-vps.sh /usr/src/aports/scripts/genapkovl-myi2pd-vps.sh
+chmod +x /usr/src/aports/scripts/genapkovl-myi2pd-vps.sh
+
+# Run Alpine image builder
+cd /usr/src/aports/scripts
+sh mkimage.sh --profile myi2pd-vps \
+  --repository https://dl-cdn.alpinelinux.org/alpine/edge/main \
+  --repository https://dl-cdn.alpinelinux.org/alpine/edge/community \
+  --outdir /build --hostkeys
+
+# Remove any previous ISO and rename the new one
+rm -f /build/myi2pd-vps.iso
+for f in /build/*.iso; do
+    [ -f "$f" ] && mv "$f" /build/myi2pd-vps.iso && break
+done
+
+echo "=== VPS ISO built successfully! ==="

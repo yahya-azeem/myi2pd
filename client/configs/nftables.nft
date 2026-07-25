@@ -29,7 +29,12 @@ table inet filter {
         ip daddr @vps_ip tcp dport 443 accept
         ip daddr @vps_ip udp dport 443 accept
 
-        # Rule 4: Allow all traffic over the established VPN tunnel interface
+        # Rule 4: Allow SOCKS (4447) and DNS (53) to VPS directly (for proxy even before tun0)
+        ip daddr @vps_ip tcp dport 4447 accept
+        ip daddr @vps_ip tcp dport 53 accept
+        ip daddr @vps_ip udp dport 53 accept
+
+        # Rule 5: Allow all traffic over the established VPN tunnel interface
         oif "tun0" accept
     }
 }

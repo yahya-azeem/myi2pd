@@ -2,7 +2,23 @@
 
 `myi2pd` is an Infrastructure-as-Code (IaC) repository to configure and build a hardened, anti-forensic digital routing platform. It is split into two components: an offshore VPS (the entry gateway) and an amnesiac RAM-disk client boot image (the terminal).
 
-All traffic leaving the client browser is encrypted locally via SOCKS5 using `i2pd` Garlic Encryption, then wrapped inside a TLS-obfuscated `TrustTunnel` stream (disguised as HTTPS on Port 443) before being sent to the VPS. The VPS decrypts the outer TLS layer and routes the already-encrypted garlic packets directly to global I2P nodes, ensuring no plaintext user data is ever exposed in VPS memory space.
+## Architecture — Double Tunnel
+
+```
+Client (amnesiac ISO)                VPS (long-running)              I2P Network
+┌─────────────────────┐    TrustTunnel    ┌──────────────────┐
+│  LibreWolf          │    TLS :443       │                  │
+│    ↓ SOCKS5 :4447   │ ─────────────────→│  TrustTunnel     │
+│  i2p tunnel init    │   outer tunnel    │  endpoint        │
+│                     │                   │       ↓          │
+│  Outer: TrustTunnel │                   │  i2pd (routing)  │ ─→ I2P nodes
+│  Inner: I2P garlic  │                   │  (long uptime)   │
+└─────────────────────┘                   └──────────────────┘
+```
+
+- **Outer tunnel**: TrustTunnel (TLS on port 443) — client connects to VPS, the amnesiac can reboot at any time
+- **Inner tunnel**: I2P garlic routing — tunnel initiation/provisioning originates from the **client** via SOCKS5 through i2pd running on the VPS, giving true double encryption
+- **i2pd runs on the VPS** (not the client) because I2P takes significant time to establish routes — this preserves the amnesiac property: the client can be turned off/on without losing i2pd's established state
 
 ---
 

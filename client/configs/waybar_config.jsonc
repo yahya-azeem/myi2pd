@@ -1,15 +1,69 @@
 {
     "layer": "top",
     "position": "top",
-    "height": 30,
-    "modules-left": ["custom/librewolf", "river/tags"],
-    "modules-center": ["river/window"],
-    "modules-right": ["clock"],
+    "height": 28,
+    "spacing": 4,
+    "modules-left": ["custom/launcher", "cpu", "memory"],
+    "modules-center": ["clock"],
+    "modules-right": ["pulseaudio", "custom/librewolf", "custom/torrent", "custom/mail", "custom/power"],
 
-    // --- The Dedicated LibreWolf Quick-Launch Button ---
-    "custom/librewolf": {
-        "format": "🌐 LAUNCH HARDENED BROWSER (LIBREWOLF)",
-        "on-click": "/usr/local/bin/librewolf-launcher",
+    "custom/launcher": {
+        "format": " \uf0c9 ",
+        "on-click": "fuzzel",
         "tooltip": false
+    },
+
+    "cpu": {
+        "format": "\uf2db {}%",
+        "interval": 5
+    },
+
+    "memory": {
+        "format": "\uf538 {}%",
+        "interval": 10
+    },
+
+    "clock": {
+        "format": "\uf017 {:%H:%M  %a %d %b}",
+        "tooltip": true,
+        "interval": 30
+    },
+
+    "pulseaudio": {
+        "format": "{icon} {volume}%",
+        "format-muted": "\uf6a9 MUTED",
+        "format-icons": {
+            "default": ["\uf026", "\uf027", "\uf028"]
+        },
+        "on-click": "pactl set-sink-mute @DEFAULT_SINK@ toggle",
+        "tooltip": false
+    },
+
+    "custom/librewolf": {
+        "format": " \uf06d ",
+        "on-click": "/usr/local/bin/librewolf-launcher",
+        "tooltip": true,
+        "tooltip-format": "Launch LibreWolf (hardened, SOCKS-forced)"
+    },
+
+    "custom/torrent": {
+        "format": " \uf0e7 ",
+        "on-click": "foot aria2c",
+        "tooltip": true,
+        "tooltip-format": "Launch aria2c (I2P-routed torrent)"
+    },
+
+    "custom/mail": {
+        "format": " \uf0e0 ",
+        "on-click": "foot /usr/local/bin/neomutt-i2p",
+        "tooltip": true,
+        "tooltip-format": "Launch NeoMutt (I2P-routed)"
+    },
+
+    "custom/power": {
+        "format": " \uf011 ",
+        "on-click": "riverctl exit",
+        "tooltip": true,
+        "tooltip-format": "Exit River (logout)"
     }
 }

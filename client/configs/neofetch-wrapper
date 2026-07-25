@@ -1,0 +1,4 @@
+#!/bin/sh
+# Display custom myi2pd ASCII art, then show system info via ncneofetch
+cat /usr/local/share/myi2pd/ascii.txt
+exec ncneofetch "$@"

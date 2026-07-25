@@ -1,0 +1,57 @@
+{
+  "policies": {
+    "SearchEngines": {
+      "Add": [
+        {
+          "Name": "Ransack I2P",
+          "URLTemplate": "http://ransack.i2p/?q={searchTerms}",
+          "Encoding": "UTF-8"
+        }
+      ],
+      "Default": "Ransack I2P",
+      "PreventInstalls": false
+    },
+    "DontCheckDefaultBrowser": true,
+    "DisableFirefoxAccounts": true,
+    "DisablePocket": true,
+    "DisableTelemetry": true,
+    "DisableFirefoxStudies": true,
+    "OverrideFirstRunPage": "",
+    "OverridePostUpdatePage": "",
+    "NoDefaultBookmarks": true,
+    "CaptivePortal": false,
+    "NetworkPrediction": false,
+    "DNSOverHTTPS": {
+      "Enabled": false
+    },
+    "EnableTrackingProtection": {
+      "Value": true,
+      "Locked": true,
+      "Cryptomining": true,
+      "Fingerprinting": true
+    },
+    "OfferToSaveLogins": false,
+    "PasswordManagerEnabled": false,
+    "SanitizeOnShutdown": {
+      "Cache": true,
+      "Cookies": true,
+      "Downloads": true,
+      "FormData": true,
+      "History": true,
+      "Sessions": true
+    },
+    "Extensions": {
+      "Install": [
+        "/usr/lib/librewolf/distribution/extensions/addon@darkreader.org.xpi"
+      ],
+      "Unwanted": [],
+      "Locked": []
+    },
+    "ExtensionSettings": {
+      "addon@darkreader.org": {
+        "installation_mode": "force_installed",
+        "default_area": "navbar"
+      }
+    }
+  }
+}

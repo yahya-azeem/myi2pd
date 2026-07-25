@@ -29,8 +29,8 @@ if [ ! -f "$DISK_PATH" ]; then
     qemu-img create -f raw "$DISK_PATH" 1G
 fi
 
-# 4. Check for KVM hardware acceleration availability
-QEMU_ARGS=("-m" "1G" "-cdrom" "$ISO_PATH" "-boot" "d" "-drive" "file=$DISK_PATH,format=raw" "-device" "virtio-vga-gl" "-display" "sdl,gl=on")
+# 4. QEMU configuration
+QEMU_ARGS=("-m" "2G" "-cdrom" "$ISO_PATH" "-boot" "d" "-drive" "file=$DISK_PATH,format=raw" "-vga" "std" "-nic" "user,model=virtio-net-pci" "-display" "gtk" "-usb" "-device" "usb-tablet" "-device" "usb-kbd" "-serial" "file:/tmp/myi2pd-serial.log")
 
 if [ -w /dev/kvm ]; then
     echo "[INFO] KVM hardware acceleration detected. Enabling KVM..."

@@ -77,7 +77,6 @@ RUN mkdir -p /build/overlay/etc/init.d \
              /build/overlay/etc/runlevels/boot \
              /build/overlay/etc/runlevels/default \
              /build/overlay/etc/nftables \
-             /build/overlay/etc/i2pd \
              /build/overlay/etc/librewolf \
              /build/overlay/etc/river \
              /build/overlay/etc/xdg/waybar \

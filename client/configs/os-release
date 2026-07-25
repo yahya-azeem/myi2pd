@@ -1,0 +1,10 @@
+NAME="myi2pd"
+PRETTY_NAME="myi2pd Amnesiac Client v1.0"
+ID=myi2pd
+ID_LIKE=alpine
+BUILD_ID=rolling
+HOME_URL="https://github.com/TrustTunnel/myi2pd"
+SUPPORT_URL="https://github.com/TrustTunnel/myi2pd"
+DOCUMENTATION_URL="https://github.com/TrustTunnel/myi2pd"
+LOGO=myi2pd
+ANSI_COLOR="0;34"

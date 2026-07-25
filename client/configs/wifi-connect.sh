@@ -158,12 +158,9 @@ fi
 
 echo "[OK] TrustTunnel VPN established!"
 
-# Start local i2pd
-echo "Starting local i2pd garlic routing daemon..."
-rc-service i2pd start || rc-service i2pd restart
-
 echo ""
 echo "[SUCCESS] myi2pd secure double-tunnel is hot!"
+echo "VPS i2pd proxy available at 10.0.0.1:4447 (SOCKS5)"
 echo "You can now safely click the browser button to surf."
 echo ""
 echo "Press [ENTER] to close this setup window..."

@@ -1,0 +1,72 @@
+#!/bin/sh
+# myi2pd River compositor launcher - called by getty on tty1
+
+export HOME=/root
+export XDG_RUNTIME_DIR=/tmp/runtime-root
+export XDG_CONFIG_HOME=$HOME/.config
+export WLR_RENDERER=pixman
+export WLR_DRM_DEBUG=1
+mkdir -p "$XDG_RUNTIME_DIR" && chmod 0700 "$XDG_RUNTIME_DIR"
+
+exec >/tmp/start-river.log 2>&1
+echo "[myi2pd] start-river running" | tee /dev/ttyS0
+echo "[myi2pd] PID: $$" | tee /dev/ttyS0
+echo "[myi2pd] tty: $(tty)" | tee /dev/ttyS0
+echo "[myi2pd] input devices:" | tee /dev/ttyS0
+ls -la /dev/input/ 2>&1 | tee /dev/ttyS0
+echo "[myi2pd] libinput list:" | tee /dev/ttyS0
+libinput list-devices 2>&1 | tee /dev/ttyS0
+echo "[myi2pd] udevadm info:" | tee /dev/ttyS0
+for dev in /dev/input/event*; do
+  [ -e "$dev" ] && udevadm info --query=property "$dev" 2>&1 | tee /dev/ttyS0 || true
+done
+echo "[myi2pd] DRM devices:" | tee /dev/ttyS0
+ls -la /dev/dri/ 2>&1 | tee /dev/ttyS0
+
+# Auto-connect TrustTunnel if VPS IP is pre-configured
+if [ -f /etc/trusttunnel/vps_ip.txt ]; then
+    VPS_IP=$(cat /etc/trusttunnel/vps_ip.txt)
+    nft add element inet filter vps_ip { "${VPS_IP}" } 2>/dev/null || \
+      echo "[myi2pd] nftables vps_ip set not ready yet"
+    echo "[myi2pd] auto-connecting TrustTunnel to $VPS_IP:443..."
+    cat > /tmp/trusttunnel-client.toml <<EOF
+[endpoint]
+address = "${VPS_IP}:443"
+skip_verification = true
+username = "myi2pduser"
+password = "myi2pdsecurepassword"
+
+[vpn]
+mode = "tun"
+tunnel_name = "tun0"
+EOF
+    /usr/local/bin/trusttunnel_client --config /tmp/trusttunnel-client.toml &
+fi
+
+echo "[myi2pd] waiting for udev..." | tee /dev/ttyS0
+udevadm settle 2>&1 | tee /dev/ttyS0
+# Force udev to re-process input devices to set ID_INPUT properties
+udevadm trigger --subsystem-match=input --action=change 2>&1 | tee /dev/ttyS0
+udevadm settle 2>&1 | tee /dev/ttyS0
+sleep 2
+# seatd is already started by OpenRC at boot — don't kill it
+echo "[myi2pd] waiting extra for connector init..." | tee /dev/ttyS0
+sleep 2
+# Rebuild font cache to pick up SauceCodePro Nerd Font from overlay
+echo "[myi2pd] rebuilding font cache..." | tee /dev/ttyS0
+fc-cache -f 2>&1 | tee /dev/ttyS0
+echo "[myi2pd] ready"
+
+# Snapshot River init log after 15s for debugging
+(sleep 15 && echo "=== River init log ===" | tee /dev/ttyS0 && cat /tmp/river.log 2>&1 | tee /dev/ttyS0 && echo "=== end ===" | tee /dev/ttyS0) &
+
+while true; do
+    echo "[myi2pd] launching river..." | tee /dev/ttyS0
+    river &>/tmp/river.log
+    rc=$?
+    echo "--- river exited with code $rc ---" | tee /dev/ttyS0
+    echo "--- wlr.log (full):" | tee /dev/ttyS0
+    cat /tmp/river.log 2>&1 | tee /dev/ttyS0
+    echo "--- wlr.log end" | tee /dev/ttyS0
+    sleep 2
+done

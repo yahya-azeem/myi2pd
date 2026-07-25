@@ -1,10 +1,12 @@
 #!/bin/bash
 set -e
 
-echo "=== Generating temporary packager signing keys ==="
-mkdir -p /root/.abuild
-abuild-keygen -a -n
-cp /root/.abuild/*.pub /etc/apk/keys/
+if [ ! -f /root/.abuild/abuild.conf ]; then
+    echo "=== Generating temporary packager signing keys ==="
+    mkdir -p /root/.abuild
+    abuild-keygen -a -n
+    cp /root/.abuild/*.pub /etc/apk/keys/
+fi
 
 echo "=== Packaging myi2pd Amnesiac ISO ==="
 
@@ -19,14 +21,50 @@ chmod +x /build/overlay/etc/init.d/*
 mkdir -p /build/overlay/etc/runlevels/boot /build/overlay/etc/runlevels/default
 
 # Enable OpenRC services in the boot and default runlevels on the client
+ln -sf /etc/init.d/hostname /build/overlay/etc/runlevels/boot/hostname
 ln -sf /etc/init.d/hdd-isolation /build/overlay/etc/runlevels/boot/hdd-isolation
-ln -sf /etc/init.d/dbus /build/overlay/etc/runlevels/default/dbus
+ln -sf /etc/init.d/udev /build/overlay/etc/runlevels/boot/udev
 ln -sf /etc/init.d/seatd /build/overlay/etc/runlevels/default/seatd
+ln -sf /etc/init.d/dbus /build/overlay/etc/runlevels/default/dbus
+ln -sf /etc/init.d/networking /build/overlay/etc/runlevels/default/networking
+
+# Add modules needed for input, display (bochs), networking, and fbdev
+echo "=== Patching base.modules ==="
+cat >> /etc/mkinitfs/features.d/base.modules << 'EXTRA'
+kernel/drivers/input/evdev.ko*
+kernel/drivers/hid/usbhid/usbhid.ko*
+kernel/drivers/hid/hid-generic.ko*
+kernel/drivers/hid/hid.ko*
+kernel/net/packet/af_packet.ko*
+kernel/drivers/gpu/drm/tiny/bochs.ko*
+kernel/drivers/video/fbdev/core/syscopyarea.ko*
+kernel/drivers/video/fbdev/core/sysfillrect.ko*
+kernel/drivers/video/fbdev/core/sysimgblt.ko*
+kernel/drivers/video/fbdev/core/fb_sys_fops.ko*
+kernel/drivers/video/fbdev/core/fb.ko*
+kernel/drivers/i2c/i2c-core.ko*
+EXTRA
+cat /etc/mkinitfs/features.d/base.modules
 
 # Run Alpine image builder using our apkovl profile configuration
-sh mkimage.sh --profile myi2pd --repository https://dl-cdn.alpinelinux.org/alpine/edge/main --repository https://dl-cdn.alpinelinux.org/alpine/edge/community --outdir /build --hostkeys
+# Background heartbeat so caller can see progress during long downloads
+{
+  while true; do
+    echo "... mkimage.sh still running (downloads + ISO generation) ..."
+    sleep 60
+  done
+} &
+heartbeat_pid=$!
+sh mkimage.sh --profile myi2pd \
+  --repository https://dl-cdn.alpinelinux.org/alpine/edge/main \
+  --repository https://dl-cdn.alpinelinux.org/alpine/edge/community \
+  --outdir /build --hostkeys
+kill "$heartbeat_pid" 2>/dev/null || true
 
-# Rename the generated ISO to the expected output filename
-mv /build/*.iso /build/myi2pd-amnesiac.iso
+# Remove any previous ISO and rename the new one
+rm -f /build/myi2pd-amnesiac.iso
+for f in /build/*.iso; do
+    [ -f "$f" ] && mv "$f" /build/myi2pd-amnesiac.iso && break
+done
 
 echo "=== ISO built successfully! ==="
