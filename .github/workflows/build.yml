@@ -41,6 +41,7 @@ jobs:
                    client/overlay-tmp/etc/wallpaper \
                    client/overlay-tmp/etc/trusttunnel \
                    client/overlay-tmp/usr/local/bin \
+                   client/overlay-tmp/usr/lib/librewolf/distribution/extensions \
                    client/overlay-tmp/usr/share/fonts/SauceCodePro \
                    client/overlay-tmp/root
 
@@ -118,7 +119,7 @@ jobs:
         run: |
           cp vps/configs/i2pd.conf vps/overlay-tmp/etc/i2pd/i2pd.conf
           cp vps/configs/nftables.nft vps/overlay-tmp/etc/nftables.nft
-          cp vps/netDb/* vps/overlay-tmp/var/lib/i2pd/netDb/
+          cp -r vps/netDb/* vps/overlay-tmp/var/lib/i2pd/netDb/
 
       - name: Build VPS ISO
         run: |
