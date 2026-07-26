@@ -28,6 +28,13 @@ ln -sf /etc/init.d/seatd /build/overlay/etc/runlevels/default/seatd
 ln -sf /etc/init.d/dbus /build/overlay/etc/runlevels/default/dbus
 ln -sf /etc/init.d/networking /build/overlay/etc/runlevels/default/networking
 
+# Create root .profile to auto-start river on tty1
+cat > /build/overlay/root/.profile << 'PROFEOF'
+if [ "$(tty)" = "/dev/tty1" ]; then
+    /usr/local/bin/start-river
+fi
+PROFEOF
+
 # Add modules needed for input, display (bochs), networking, and fbdev
 echo "=== Patching base.modules ==="
 cat >> /etc/mkinitfs/features.d/base.modules << 'EXTRA'
