@@ -35,6 +35,40 @@ if [ "$(tty)" = "/dev/tty1" ]; then
 fi
 PROFEOF
 
+# Create apk world file so packages are installed at boot (diskless mode)
+mkdir -p /build/overlay/etc/apk
+cat > /build/overlay/etc/apk/world << 'WORLDFILE'
+alpine-base
+nftables
+bash
+openssl
+wireless-tools
+wpa_supplicant
+e2fsprogs
+river-classic
+fuzzel
+waybar
+foot
+font-dejavu
+fontconfig
+seatd
+seatd-launch
+dbus
+dbus-x11
+dbus-openrc
+librewolf
+mesa-dri-gallium
+swaybg
+udev
+util-linux
+util-linux-misc
+agetty
+libdrm-tests
+ncneofetch
+neomutt
+linux-firmware-none
+WORLDFILE
+
 # Add modules needed for input, display (bochs), networking, and fbdev
 echo "=== Patching base.modules ==="
 cat >> /etc/mkinitfs/features.d/base.modules << 'EXTRA'
