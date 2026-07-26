@@ -10,13 +10,9 @@ fi
 
 echo "=== Packaging myi2pd VPS Gateway ISO ==="
 
-# Copy binaries
-cp /usr/local/bin/trusttunnel_endpoint /build/overlay/usr/local/bin/
-cp /usr/local/bin/setup_wizard /build/overlay/usr/local/bin/
-
-# Set execution permissions
-chmod +x /build/overlay/usr/local/bin/*
-chmod +x /build/overlay/etc/init.d/*
+# Set execution permissions (binaries pre-placed by host)
+chmod +x /build/overlay/usr/local/bin/* 2>/dev/null || true
+chmod +x /build/overlay/etc/init.d/* 2>/dev/null || true
 
 # Ensure runlevels directories exist
 mkdir -p /build/overlay/etc/runlevels/boot /build/overlay/etc/runlevels/default
