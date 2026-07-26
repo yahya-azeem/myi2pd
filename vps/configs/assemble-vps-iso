@@ -102,9 +102,7 @@ auto eth0
 iface eth0 inet dhcp
 INTFEOF
 
-# Copy profile and genapkovl scripts to aports location
-cp /vps/configs/mkimg.myi2pd-vps.sh /usr/src/aports/scripts/mkimg.myi2pd-vps.sh
-cp /vps/configs/genapkovl-myi2pd-vps.sh /usr/src/aports/scripts/genapkovl-myi2pd-vps.sh
+# Ensure scripts are executable
 chmod +x /usr/src/aports/scripts/genapkovl-myi2pd-vps.sh
 
 # Run Alpine image builder
