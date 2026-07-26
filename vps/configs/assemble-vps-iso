@@ -17,12 +17,7 @@ chmod +x /build/overlay/etc/init.d/* 2>/dev/null || true
 # Ensure runlevels directories exist
 mkdir -p /build/overlay/etc/runlevels/boot /build/overlay/etc/runlevels/default
 
-# Copy i2pd config
-mkdir -p /build/overlay/etc/i2pd
-cp /build/overlay/etc/i2pd/i2pd.conf /build/overlay/etc/i2pd/i2pd.conf
-
-# Copy nftables config
-cp /build/overlay/etc/nftables.nft /build/overlay/etc/nftables.nft
+# TrustTunnel, i2pd, and nftables configs are pre-placed by GHA copy step
 
 # Create trusttunnel init script
 cat > /build/overlay/etc/init.d/trusttunnel << 'INITEOF'
