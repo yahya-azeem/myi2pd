@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: '0 0 1,15 * *'
   workflow_dispatch:
 
 jobs:
@@ -50,6 +52,8 @@ jobs:
           cp client/configs/inittab client/overlay-tmp/etc/inittab
           cp client/configs/river_init client/overlay-tmp/etc/river/init
           cp client/configs/start-river client/overlay-tmp/usr/local/bin/start-river
+          cp client/configs/hdd-isolation client/overlay-tmp/etc/init.d/hdd-isolation
+          cp client/configs/i2p-keepalive.sh client/overlay-tmp/usr/local/bin/i2p-keepalive.sh
           cp client/configs/foot.ini client/overlay-tmp/etc/foot.ini
           cp client/configs/waybar_config.jsonc client/overlay-tmp/etc/xdg/waybar/config.jsonc
           cp client/configs/waybar_style.css client/overlay-tmp/etc/xdg/waybar/style.css
@@ -109,17 +113,18 @@ jobs:
                    vps/overlay-tmp/etc/runlevels/default \
                    vps/overlay-tmp/etc/i2pd \
                    vps/overlay-tmp/etc/network \
+                   vps/overlay-tmp/etc/sysctl.d \
                    vps/overlay-tmp/usr/local/bin \
                    vps/overlay-tmp/root \
                    vps/overlay-tmp/var/lib/i2pd/netDb
-          chmod 0755 vps/overlay-tmp/var/lib/i2pd
-          chmod 0755 vps/overlay-tmp/var/lib/i2pd/netDb
 
-      - name: Copy VPS configs to overlay
+      - name: Copy VPS configs and binaries to overlay
         run: |
           cp vps/configs/i2pd.conf vps/overlay-tmp/etc/i2pd/i2pd.conf
           cp vps/configs/nftables.nft vps/overlay-tmp/etc/nftables.nft
           cp -r vps/netDb/* vps/overlay-tmp/var/lib/i2pd/netDb/
+          cp vps/bin/trusttunnel_endpoint vps/overlay-tmp/usr/local/bin/
+          cp vps/bin/setup_wizard vps/overlay-tmp/usr/local/bin/
 
       - name: Build VPS ISO
         run: |
@@ -130,7 +135,6 @@ jobs:
             -v "$(pwd)/vps/out:/build" \
             -v "$(pwd)/vps/configs/mkimg.myi2pd-vps.sh:/usr/src/aports/scripts/mkimg.myi2pd-vps.sh" \
             -v "$(pwd)/vps/configs/genapkovl-myi2pd-vps.sh:/usr/src/aports/scripts/genapkovl-myi2pd-vps.sh" \
-            -v "$(pwd)/vps/configs/assemble-vps-iso:/usr/src/aports/scripts/assemble-vps-iso" \
             myi2pd-builder:vps sh -c '
               set -e
               if [ ! -f /root/.abuild/abuild.conf ]; then
@@ -138,18 +142,117 @@ jobs:
                   abuild-keygen -a -n
                   cp /root/.abuild/*.pub /etc/apk/keys/
               fi
+
+              chmod +x /build/overlay/usr/local/bin/* /build/overlay/etc/init.d/* 2>/dev/null || true
+
               mkdir -p /build/overlay/etc/runlevels/boot /build/overlay/etc/runlevels/default
-              chmod +x /build/overlay/etc/init.d/* 2>/dev/null || true
-              sh /usr/src/aports/scripts/assemble-vps-iso
+
+              ln -sf /etc/init.d/hostname /build/overlay/etc/runlevels/boot/hostname
+              ln -sf /etc/init.d/udev /build/overlay/etc/runlevels/boot/udev
+              ln -sf /etc/init.d/networking /build/overlay/etc/runlevels/default/networking
+              ln -sf /etc/init.d/nftables /build/overlay/etc/runlevels/default/nftables
+              ln -sf /etc/init.d/i2pd /build/overlay/etc/runlevels/default/i2pd
+              ln -sf /etc/init.d/dnsmasq /build/overlay/etc/runlevels/default/dnsmasq
+
+              cat > /build/overlay/etc/init.d/trusttunnel << "EOF"
+        #!/sbin/openrc-run
+        name="trusttunnel"
+        description="TrustTunnel VPN Endpoint Daemon"
+        command="/usr/local/bin/trusttunnel_endpoint"
+        command_args="/etc/trusttunnel/vpn.toml /etc/trusttunnel/hosts.toml"
+        command_background=true
+        pidfile="/run/RC_SVCNAME.pid"
+        depend() { need net; after nftables; }
+        start_pre() {
+            [ -d /etc/trusttunnel ] || mkdir -p /etc/trusttunnel
+            [ -f /etc/trusttunnel/server.crt ] || openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/trusttunnel/server.key -out /etc/trusttunnel/server.crt -subj "/CN=10.10.10.1" 2>/dev/null
+            [ -f /etc/trusttunnel/hosts.toml ] || cat > /etc/trusttunnel/hosts.toml << "TOML"
+        [[main_hosts]]
+        hostname = "10.10.10.1"
+        cert_chain_path = "/etc/trusttunnel/server.crt"
+        private_key_path = "/etc/trusttunnel/server.key"
+        TOML
+            [ -f /etc/trusttunnel/vpn.toml ] || setup_wizard -m non-interactive -a 0.0.0.0:443 -c "myi2pduser:myi2pdsecurepassword" -n "10.10.10.1" --lib-settings /etc/trusttunnel/vpn.toml --hosts-settings /etc/trusttunnel/hosts.toml --client-settings /etc/trusttunnel/client.toml 2>/dev/null || true
+        }
+        EOF
+              chmod +x /build/overlay/etc/init.d/trusttunnel
+              ln -sf /etc/init.d/trusttunnel /build/overlay/etc/runlevels/default/trusttunnel
+
+              cat > /build/overlay/etc/init.d/eth1-lan << "EOF"
+        #!/sbin/openrc-run
+        description="Private LAN interface for client VMs"
+        depend() { need net; }
+        start() {
+            ebegin "Fixing i2pd data directory permissions"
+            chmod 0777 /var/lib/i2pd 2>/dev/null || true
+            chmod -R 0777 /var/lib/i2pd/netDb 2>/dev/null || true
+            eend 0
+            ebegin "Setting up eth1 private LAN"
+            ip addr add 10.10.10.1/24 dev eth1 2>/dev/null || true
+            ip link set eth1 up 2>/dev/null || true
+            eend 0
+        }
+        EOF
+              chmod +x /build/overlay/etc/init.d/eth1-lan
+              ln -sf /etc/init.d/eth1-lan /build/overlay/etc/runlevels/boot/eth1-lan
+
+              cat > /build/overlay/root/.profile << "EOF"
+        [ -f /etc/profile ] && . /etc/profile
+        echo "=== myi2pd VPS Gateway ==="
+        echo "i2pd status: $(rc-service i2pd status 2>/dev/null | grep -o "started\|stopped" || echo "unknown")"
+        echo "eth0: $(ip -4 addr show eth0 2>/dev/null | grep -o "inet [0-9.]*" | cut -d" " -f2)"
+        EOF
+
+              cat > /build/overlay/usr/local/bin/autologin << "EOF"
+        #!/bin/sh
+        exec /bin/login -f root
+        EOF
+              chmod +x /build/overlay/usr/local/bin/autologin
+
+              cat > /build/overlay/etc/inittab << "EOF"
+        ::sysinit:/sbin/openrc sysinit
+        ::sysinit:/sbin/openrc boot
+        ::wait:/sbin/openrc default
+        ttyS0::respawn:/sbin/getty -L 38400 -l /usr/local/bin/autologin -n ttyS0
+        ::ctrlaltdel:/sbin/reboot
+        ::shutdown:/sbin/openrc shutdown
+        EOF
+
+              cat > /build/overlay/etc/dnsmasq.conf << "EOF"
+        interface=eth1
+        dhcp-range=10.10.10.10,10.10.10.20,255.255.255.0,12h
+        dhcp-option=3,10.10.10.1
+        dhcp-option=6,1.1.1.1
+        EOF
+
+              echo "myi2pd-gateway" > /build/overlay/etc/hostname
+
+              cat > /build/overlay/etc/sysctl.d/hardening.conf << "EOF"
+        kernel.dmesg_restrict = 1
+        kernel.kptr_restrict = 2
+        kernel.unprivileged_bpf_disabled = 1
+        net.core.bpf_jit_harden = 2
+        vm.swappiness = 0
+        EOF
+
+              cat > /build/overlay/etc/network/interfaces << "EOF"
+        auto lo
+        iface lo inet loopback
+        auto eth0
+        iface eth0 inet dhcp
+        EOF
+
               cd /usr/src/aports/scripts
               sh mkimage.sh --profile myi2pd-vps \
                 --repository https://dl-cdn.alpinelinux.org/alpine/edge/main \
                 --repository https://dl-cdn.alpinelinux.org/alpine/edge/community \
                 --outdir /build --hostkeys
+
               rm -f /build/myi2pd-vps.iso
               for f in /build/*.iso; do
                   [ -f "$f" ] && mv "$f" /build/myi2pd-vps.iso && break
               done
+              echo "=== VPS ISO built ==="
             '
 
       - name: Rename and upload VPS ISO

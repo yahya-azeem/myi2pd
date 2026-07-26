@@ -14,8 +14,8 @@ echo "=== Packaging myi2pd Amnesiac ISO ==="
 cp /usr/local/bin/trusttunnel_client /build/overlay/usr/local/bin/
 
 # Set execution permissions on overlay files
-chmod +x /build/overlay/usr/local/bin/*
-chmod +x /build/overlay/etc/init.d/*
+chmod +x /build/overlay/usr/local/bin/* 2>/dev/null || true
+chmod +x /build/overlay/etc/init.d/* 2>/dev/null || true
 
 # Ensure runlevels directories exist in overlay
 mkdir -p /build/overlay/etc/runlevels/boot /build/overlay/etc/runlevels/default

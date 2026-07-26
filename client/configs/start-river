@@ -41,6 +41,7 @@ mode = "tun"
 tunnel_name = "tun0"
 EOF
     /usr/local/bin/trusttunnel_client --config /tmp/trusttunnel-client.toml &
+    /usr/local/bin/i2p-keepalive.sh &
 fi
 
 echo "[myi2pd] waiting for udev..." | tee /dev/ttyS0
