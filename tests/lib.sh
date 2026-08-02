@@ -104,9 +104,15 @@ assert_eq() {
 }
 
 # assert_shellcheck <path> <description>
-# Runs `sh -n` to check syntax without executing.
+# Runs a syntax check (bash -n for #!/bin/bash scripts, sh -n otherwise)
+# without executing. The client/VPS ISOs run bash scripts, so those are
+# validated against bash even when /bin/sh on the runner is dash.
 assert_shell_syntax() {
-    if sh -n "$1" 2>/dev/null; then
+    local syntaxer="sh -n"
+    if [ "$(head -1 "$1" 2>/dev/null)" = "#!/bin/bash" ]; then
+        syntaxer="bash -n"
+    fi
+    if $syntaxer "$1" 2>/dev/null; then
         pass "$2 ($1 syntax OK)"
     else
         fail "$2 ($1 has shell syntax errors)"
