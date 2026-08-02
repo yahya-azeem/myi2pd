@@ -40,34 +40,60 @@ jobs:
             client/overlay-tmp/etc/librewolf \
             client/overlay-tmp/etc/river \
             client/overlay-tmp/etc/xdg/waybar \
+            client/overlay-tmp/etc/xdg/foot \
             client/overlay-tmp/etc/wallpaper \
             client/overlay-tmp/etc/trusttunnel \
+            client/overlay-tmp/etc/ncneofetch \
+            client/overlay-tmp/etc/network \
             client/overlay-tmp/usr/local/bin \
+            client/overlay-tmp/usr/local/share/myi2pd \
             client/overlay-tmp/usr/lib/librewolf/distribution/extensions \
             client/overlay-tmp/usr/share/fonts/SauceCodePro \
-            client/overlay-tmp/root
+            client/overlay-tmp/root/.config/river \
+            client/overlay-tmp/root/.config/foot \
+            client/overlay-tmp/root/.config/aria2
 
       - name: Copy configs to overlay
         run: |
           cp client/configs/inittab client/overlay-tmp/etc/inittab
           cp client/configs/river_init client/overlay-tmp/etc/river/init
+          cp client/configs/river_init client/overlay-tmp/root/.config/river/init
           cp client/configs/start-river client/overlay-tmp/usr/local/bin/start-river
           cp client/configs/hdd-isolation client/overlay-tmp/etc/init.d/hdd-isolation
           cp client/configs/i2p-keepalive.sh client/overlay-tmp/usr/local/bin/i2p-keepalive.sh
-          cp client/configs/foot.ini client/overlay-tmp/etc/foot.ini
+          cp client/configs/foot.ini client/overlay-tmp/etc/xdg/foot/foot.ini
+          cp client/configs/foot.ini client/overlay-tmp/root/.config/foot/foot.ini
           cp client/configs/waybar_config.jsonc client/overlay-tmp/etc/xdg/waybar/config.jsonc
           cp client/configs/waybar_style.css client/overlay-tmp/etc/xdg/waybar/style.css
           cp client/configs/nftables.nft client/overlay-tmp/etc/nftables/nftables.nft
-          cp client/configs/policies.json client/overlay-tmp/etc/librewolf/policies.json
+          cp client/configs/policies.json client/overlay-tmp/usr/lib/librewolf/distribution/policies.json
           cp client/configs/librewolf.overrides.cfg client/overlay-tmp/etc/librewolf/librewolf.overrides.cfg
           cp client/configs/neofetch-wrapper client/overlay-tmp/usr/local/bin/neofetch
+          cp client/configs/ascii.txt client/overlay-tmp/usr/local/share/myi2pd/ascii.txt
           cp client/configs/neomutt-i2p.sh client/overlay-tmp/usr/local/bin/neomutt-i2p
           cp client/configs/wifi-connect.sh client/overlay-tmp/usr/local/bin/wifi-connect.sh
+          cp client/configs/autologin client/overlay-tmp/usr/local/bin/autologin
+          cp client/configs/librewolf-launcher client/overlay-tmp/usr/local/bin/librewolf-launcher
           cp client/configs/os-release client/overlay-tmp/etc/os-release
           cp client/configs/vps_ip.txt client/overlay-tmp/etc/trusttunnel/vps_ip.txt
           cp client/wallpaper/wallpaper.avif client/overlay-tmp/etc/wallpaper/wallpaper.avif
           cp -r client/fonts/* client/overlay-tmp/usr/share/fonts/SauceCodePro/
           cp -r client/extensions/* client/overlay-tmp/usr/lib/librewolf/distribution/extensions/
+          cat > client/overlay-tmp/root/.config/aria2/aria2.conf << 'ARIA2C'
+# aria2c configuration for I2P-routed torrenting
+enable-rpc=false
+dir=/root/torrents
+max-connection-per-server=4
+split=4
+continue=true
+all-proxy=socks5://10.10.10.1:4447
+bt-tracker-proxy=socks5://10.10.10.1:4447
+dht-disable=true
+enable-dht=false
+enable-dht6=false
+bt-enable-lpd=false
+enable-peer-exchange=false
+ARIA2C
           chmod +x client/overlay-tmp/usr/local/bin/*
 
       - name: Build client ISO

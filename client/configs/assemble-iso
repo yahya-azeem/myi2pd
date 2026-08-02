@@ -69,6 +69,19 @@ neomutt
 linux-firmware-none
 WORLDFILE
 
+# hostname
+echo "myi2pd" > /build/overlay/etc/hostname
+
+# network interfaces
+cat > /build/overlay/etc/network/interfaces << 'INTFEOF'
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet dhcp
+    udhcpc_opts -b
+INTFEOF
+
 # Add modules needed for input, display (bochs), networking, and fbdev
 echo "=== Patching base.modules ==="
 cat >> /etc/mkinitfs/features.d/base.modules << 'EXTRA'
