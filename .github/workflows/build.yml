@@ -80,20 +80,20 @@ jobs:
           cp -r client/fonts/* client/overlay-tmp/usr/share/fonts/SauceCodePro/
           cp -r client/extensions/* client/overlay-tmp/usr/lib/librewolf/distribution/extensions/
           cat > client/overlay-tmp/root/.config/aria2/aria2.conf << 'ARIA2C'
-# aria2c configuration for I2P-routed torrenting
-enable-rpc=false
-dir=/root/torrents
-max-connection-per-server=4
-split=4
-continue=true
-all-proxy=socks5://10.10.10.1:4447
-bt-tracker-proxy=socks5://10.10.10.1:4447
-dht-disable=true
-enable-dht=false
-enable-dht6=false
-bt-enable-lpd=false
-enable-peer-exchange=false
-ARIA2C
+          # aria2c configuration for I2P-routed torrenting
+          enable-rpc=false
+          dir=/root/torrents
+          max-connection-per-server=4
+          split=4
+          continue=true
+          all-proxy=socks5://10.10.10.1:4447
+          bt-tracker-proxy=socks5://10.10.10.1:4447
+          dht-disable=true
+          enable-dht=false
+          enable-dht6=false
+          bt-enable-lpd=false
+          enable-peer-exchange=false
+          ARIA2C
           chmod +x client/overlay-tmp/usr/local/bin/*
 
       - name: Build client ISO
