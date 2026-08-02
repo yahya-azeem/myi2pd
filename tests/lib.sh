@@ -104,13 +104,14 @@ assert_eq() {
 }
 
 # assert_shellcheck <path> <description>
-# Runs a syntax check (bash -n for #!/bin/bash scripts, sh -n otherwise)
-# without executing. The client/VPS ISOs run bash scripts, so those are
-# validated against bash even when /bin/sh on the runner is dash.
+# Runs a syntax check without executing. The ISOs run Alpine busybox ash +
+# bash, so scripts (including sourced fragments like mkimg profiles, which
+# dash rejects for hyphenated function names) are validated against bash.
+# Only files with an explicit #!/bin/sh shebang are checked as POSIX sh.
 assert_shell_syntax() {
-    local syntaxer="sh -n"
-    if [ "$(head -1 "$1" 2>/dev/null)" = "#!/bin/bash" ]; then
-        syntaxer="bash -n"
+    local syntaxer="bash -n"
+    if [ "$(head -1 "$1" 2>/dev/null)" = "#!/bin/sh" ]; then
+        syntaxer="sh -n"
     fi
     if $syntaxer "$1" 2>/dev/null; then
         pass "$2 ($1 syntax OK)"
