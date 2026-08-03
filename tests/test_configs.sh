@@ -96,6 +96,12 @@ assert_contains "$WORLD" 'pentest-apks.list' "assemble-iso appends pentest-apks.
 # The mkimg profile reads the pentest apk list into the ISO apk cache.
 assert_contains "$REPO_ROOT/client/configs/mkimg.myi2pd.sh" 'pentest-apks.list' \
     "mkimg profile bakes pentest apks into ISO cache"
+# It MUST strip comments when reading the list - apk treats each world token as
+# a package and "#" comment words fail the build (seen in CI).
+assert_contains "$REPO_ROOT/client/configs/mkimg.myi2pd.sh" "sed -e 's/#.*//'" \
+    "mkimg profile strips comments from pentest-apks.list"
+assert_contains "$REPO_ROOT/client/configs/assemble-iso" "sed -e 's/#.*//'" \
+    "assemble-iso strips comments when appending to world"
 # Build scripts (local + CI) must ship the two pentest files into the overlay.
 for f in "$REPO_ROOT/client/build_iso.sh" "$REPO_ROOT/.github/workflows/build.yml"; do
     assert_contains "$f" 'pentest-apks.list' "$(basename "$f") copies pentest-apks.list"
@@ -108,6 +114,9 @@ else
     pass "pentest-apks.list has no gcc (uses clang20)"
 fi
 assert_contains "$REPO_ROOT/client/configs/pentest-apks.list" '^clang20$' "pentest list pins clang20"
+# pypykatz: pure-Python Mimikatz, pip-installed (Alpine package pins old python).
+assert_contains "$REPO_ROOT/client/configs/pentest-extra.sh" 'pypykatz' \
+    "pentest-extra.sh pip-installs pypykatz"
 
 summary
 exit $?

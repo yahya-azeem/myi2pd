@@ -62,9 +62,15 @@ done
 # --- FOSS pentest tooling ---
 # Alpine-packaged tools must be in world (baked into the ISO).
 for pkg in ffuf sqlmap hashcat gitleaks nuclei httpx naabu katana rustscan \
-           mitmproxy rizin pypykatz py3-impacket; do
+           mitmproxy rizin py3-impacket; do
     assert_contains "$CLIENT_OVERLAY/etc/apk/world" "^$pkg\$" "client world pentest: $pkg"
 done
+# pypykatz is pip-installed (Alpine pins python3~3.12; edge has 3.14).
+if grep -q '^pypykatz$' "$CLIENT_OVERLAY/etc/apk/world"; then
+    fail "pypykatz must be pip-installed, not baked (python3~3.12 pin conflicts with edge 3.14)"
+else
+    pass "pypykatz excluded from world (pip-installed via pentest-extra.sh)"
+fi
 
 # python + clang preinstalled, explicitly NO gcc.
 assert_contains "$CLIENT_OVERLAY/etc/apk/world" "^python3\$" "client world: python3 present"
