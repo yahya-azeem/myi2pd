@@ -12,5 +12,5 @@ profile_myi2pd() {
     syslinux_timeout=1
     grub_timeout=0
     syslinux_serial="0 38400"
-    kernel_cmdline="console=tty0 console=ttyS0,38400 net.ifnames=0 bochs.defx=1024 bochs.defy=768 modules=usbhid,evdev,hid_generic,af_packet,psmouse,xhci-hcd,xhci-pci,ehci-hcd,ehci-pci,uhci-hcd,virtio_input,virtio_net,bochs"
+    kernel_cmdline="console=tty0 console=ttyS0,38400 net.ifnames=0 bochs.defx=1024 bochs.defy=768 rootflags=size=80% modules=usbhid,evdev,hid_generic,af_packet,psmouse,xhci-hcd,xhci-pci,ehci-hcd,ehci-pci,uhci-hcd,virtio_input,virtio_net,bochs"
 }
