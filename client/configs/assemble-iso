@@ -69,15 +69,25 @@ neomutt
 linux-firmware-none
 WORLDFILE
 
-# Append FOSS pentest tooling (Alpine-packaged) to the world file. These are
-# the lightweight tools; the heavy ones (netexec, sliver, evil-winrm, ...) are
-# installed on demand by /usr/local/bin/pentest-extra.sh to keep the amnesiac
-# RAM footprint small. Source of truth: client/configs/pentest-apks.list
+# Append FOSS pentest tooling (Alpine-packaged) to the world file. Only the
+# lightweight tools go into world (RAM at boot); the heavy ones (hashcat,
+# nuclei, httpx, naabu, katana, clang20) ship on the ISO on-disk repository
+# but are installed on demand by /usr/local/bin/pentest-extra.sh to keep the
+# diskless RAM footprint small enough to boot on 4G.
+# Source of truth: client/configs/pentest-apks.list
 if [ -f /build/overlay/etc/pentest-apks.list ]; then
     echo "=== Appending pentest apks to world ==="
     # Strip comments/blank lines: apk's world file does NOT tolerate them.
     sed -e 's/#.*//' -e '/^[[:space:]]*$/d' /build/overlay/etc/pentest-apks.list \
-        >> /build/overlay/etc/apk/world
+        > /tmp/pentest-world
+    # Exclude the heavy lazy-loaded tools from world (kept on ISO, loaded on demand).
+    if [ -f /build/overlay/etc/pentest-lazy.list ]; then
+        grep -vxF -f <(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' /build/overlay/etc/pentest-lazy.list) \
+            /tmp/pentest-world > /tmp/pentest-world-light
+        mv /tmp/pentest-world-light /tmp/pentest-world
+    fi
+    cat /tmp/pentest-world >> /build/overlay/etc/apk/world
+    rm -f /tmp/pentest-world
     # clang20 is installed (not gcc). Explicitly guard: gcc must never land in world.
     grep -q '^gcc$' /build/overlay/etc/apk/world && \
         sed -i '/^gcc$/d' /build/overlay/etc/apk/world && \

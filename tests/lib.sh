@@ -177,6 +177,7 @@ assemble_client_overlay() {
     cp "$REPO_ROOT/client/configs/os-release" "$dest/etc/os-release"
     cp "$REPO_ROOT/client/configs/vps_ip.txt" "$dest/etc/trusttunnel/vps_ip.txt"
     cp "$REPO_ROOT/client/configs/pentest-apks.list" "$dest/etc/pentest-apks.list"
+    cp "$REPO_ROOT/client/configs/pentest-lazy.list" "$dest/etc/pentest-lazy.list"
     cp "$REPO_ROOT/client/configs/pentest-extra.sh" "$dest/usr/local/bin/pentest-extra.sh"
     if [ -f "$REPO_ROOT/client/wallpaper/wallpaper.png" ]; then
         cp "$REPO_ROOT/client/wallpaper/wallpaper.png" "$dest/etc/wallpaper/wallpaper.png"
@@ -254,9 +255,16 @@ WORLDFILE
 
     # Append FOSS pentest tooling to world (mirrors assemble-iso). Source of
     # truth: client/configs/pentest-apks.list. Comments are stripped because
-    # apk's world file does NOT tolerate them.
+    # apk's world file does NOT tolerate them. Heavy tools from the lazy list
+    # are excluded (kept on ISO disk, loaded on demand by pentest-extra.sh).
     if [ -f "$dest/etc/pentest-apks.list" ]; then
-        sed -e 's/#.*//' -e '/^[[:space:]]*$/d' "$dest/etc/pentest-apks.list" >> "$dest/etc/apk/world"
+        sed -e 's/#.*//' -e '/^[[:space:]]*$/d' "$dest/etc/pentest-apks.list" > /tmp/pw
+        if [ -f "$dest/etc/pentest-lazy.list" ]; then
+            grep -vxF -f <(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' "$dest/etc/pentest-lazy.list") /tmp/pw > /tmp/pwl
+            mv /tmp/pwl /tmp/pw
+        fi
+        cat /tmp/pw >> "$dest/etc/apk/world"
+        rm -f /tmp/pw
         sed -i '/^gcc$/d' "$dest/etc/apk/world" 2>/dev/null || true
     fi
 

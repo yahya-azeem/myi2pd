@@ -133,8 +133,11 @@ fi
 
 # FOSS pentest tooling: Alpine apk list (baked) + on-demand heavy installer.
 # The apk list is appended to /etc/apk/world by assemble-iso inside the
-# container; pentest-extra.sh installs the non-Alpine tools at runtime.
+# container (minus the lazy set); pentest-extra.sh installs the heavy + non-
+# Alpine tools at runtime. The lazy list ships so pentest-extra.sh can offline
+# apk-add the heavy tools from the live ISO repo on demand.
 cp "$WORKSPACE_DIR/configs/pentest-apks.list" "$OVERLAY_TMP/etc/pentest-apks.list"
+cp "$WORKSPACE_DIR/configs/pentest-lazy.list" "$OVERLAY_TMP/etc/pentest-lazy.list"
 cp "$WORKSPACE_DIR/configs/pentest-extra.sh" "$OVERLAY_TMP/usr/local/bin/pentest-extra.sh"
 chmod +x "$OVERLAY_TMP/usr/local/bin/pentest-extra.sh"
 

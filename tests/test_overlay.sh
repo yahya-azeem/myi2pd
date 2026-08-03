@@ -60,10 +60,20 @@ for pkg in river-classic seatd dbus librewolf fuzzel waybar foot agetty; do
 done
 
 # --- FOSS pentest tooling ---
-# Alpine-packaged tools must be in world (baked into the ISO).
-for pkg in ffuf sqlmap hashcat gitleaks nuclei httpx naabu katana rustscan \
-           mitmproxy rizin py3-impacket; do
+# Light Alpine-packaged tools must be in world (baked into RAM at boot).
+for pkg in ffuf sqlmap gitleaks rustscan mitmproxy rizin py3-impacket; do
     assert_contains "$CLIENT_OVERLAY/etc/apk/world" "^$pkg\$" "client world pentest: $pkg"
+done
+# Heavy tools are shipped on the ISO's on-disk repository but NOT in world - if
+# they were in world they'd extract into RAM at boot and overflow the diskless
+# tmpfs root (the reason the desktop didn't launch at 4G). They load on demand
+# via pentest-extra.sh.
+for pkg in hashcat nuclei httpx naabu katana clang20; do
+    if grep -q "^$pkg\$" "$CLIENT_OVERLAY/etc/apk/world"; then
+        fail "heavy pentest tool $pkg must be lazy-loaded, not baked into world"
+    else
+        pass "heavy pentest tool $pkg excluded from world (lazy-loaded)"
+    fi
 done
 # pypykatz is pip-installed (Alpine pins python3~3.12; edge has 3.14).
 if grep -q '^pypykatz$' "$CLIENT_OVERLAY/etc/apk/world"; then
@@ -72,10 +82,15 @@ else
     pass "pypykatz excluded from world (pip-installed via pentest-extra.sh)"
 fi
 
-# python + clang preinstalled, explicitly NO gcc.
+# python + pip preinstalled (light, needed by pentest-extra.sh at runtime).
+# clang20 is lazy-loaded (heavy), explicitly NO gcc.
 assert_contains "$CLIENT_OVERLAY/etc/apk/world" "^python3\$" "client world: python3 present"
 assert_contains "$CLIENT_OVERLAY/etc/apk/world" "^py3-pip\$" "client world: pip present"
-assert_contains "$CLIENT_OVERLAY/etc/apk/world" "^clang20\$" "client world: clang20 present"
+if grep -q '^clang20$' "$CLIENT_OVERLAY/etc/apk/world"; then
+    fail "clang20 must be lazy-loaded (heavy ~230MB), not baked into world"
+else
+    pass "clang20 excluded from world (lazy-loaded)"
+fi
 if grep -q '^gcc$' "$CLIENT_OVERLAY/etc/apk/world"; then
     fail "client world must NOT contain gcc"
 else
@@ -85,6 +100,11 @@ fi
 # On-demand heavy tools installer ships in the overlay.
 assert_file "$CLIENT_OVERLAY/usr/local/bin/pentest-extra.sh" "client pentest-extra.sh exists"
 assert_executable "$CLIENT_OVERLAY/usr/local/bin/pentest-extra.sh" "client pentest-extra.sh executable"
+# The lazy list (heavy .apk names) must ship so pentest-extra.sh can offline
+# apk-add them from the live ISO repo.
+assert_file "$CLIENT_OVERLAY/etc/pentest-lazy.list" "client pentest-lazy.list exists"
+assert_contains "$CLIENT_OVERLAY/usr/local/bin/pentest-extra.sh" 'pentest-lazy.list' \
+    "pentest-extra.sh reads pentest-lazy.list"
 
 # --- nftables + trusttunnel configs ---
 assert_file "$CLIENT_OVERLAY/etc/nftables/nftables.nft" "client nftables.nft exists"

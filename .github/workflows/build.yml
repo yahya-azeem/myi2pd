@@ -77,6 +77,7 @@ jobs:
           cp client/configs/os-release client/overlay-tmp/etc/os-release
           cp client/configs/vps_ip.txt client/overlay-tmp/etc/trusttunnel/vps_ip.txt
           cp client/configs/pentest-apks.list client/overlay-tmp/etc/pentest-apks.list
+          cp client/configs/pentest-lazy.list client/overlay-tmp/etc/pentest-lazy.list
           cp client/configs/pentest-extra.sh client/overlay-tmp/usr/local/bin/pentest-extra.sh
           chmod +x client/overlay-tmp/usr/local/bin/pentest-extra.sh
           cp client/wallpaper/wallpaper.png client/overlay-tmp/etc/wallpaper/wallpaper.png
