@@ -55,31 +55,51 @@ tar -tzf "$TMP/$APKOVL" > "$TMP/apkovl-list.txt" 2>/dev/null
 
 # --- apkovl content checks ---
 group "apkovl content: $APKOVL"
-assert_contains "$TMP/apkovl-list.txt" "./etc/inittab" "apkovl has inittab"
-assert_contains "$TMP/apkovl-list.txt" "./root/.profile" "apkovl has /root/.profile"
-assert_contains "$TMP/apkovl-list.txt" "start-river" "apkovl has start-river"
-assert_contains "$TMP/apkovl-list.txt" "./etc/apk/world" "apkovl has /etc/apk/world"
+case "$ISO" in
+    *amnesiac*|*client*)
+        # Client (amnesiac) ISO: graphical diskless Alpine client
+        assert_contains "$TMP/apkovl-list.txt" "./etc/inittab" "apkovl has inittab"
+        assert_contains "$TMP/apkovl-list.txt" "./root/.profile" "apkovl has /root/.profile"
+        assert_contains "$TMP/apkovl-list.txt" "start-river" "apkovl has start-river"
+        assert_contains "$TMP/apkovl-list.txt" "./etc/apk/world" "apkovl has /etc/apk/world"
 
-# hostname + interfaces MUST be in the apkovl (they were the missing pieces)
-if grep -q './etc/hostname' "$TMP/apkovl-list.txt"; then
-    pass "apkovl has /etc/hostname"
-else
-    fail "apkovl MISSING /etc/hostname (ISO will boot as 'localhost')"
-fi
-if grep -q './etc/network/interfaces' "$TMP/apkovl-list.txt"; then
-    pass "apkovl has /etc/network/interfaces"
-else
-    fail "apkovl MISSING /etc/network/interfaces (networking fails at boot)"
-fi
+        # hostname + interfaces MUST be in the apkovl (they were the missing pieces)
+        if grep -q './etc/hostname' "$TMP/apkovl-list.txt"; then
+            pass "apkovl has /etc/hostname"
+        else
+            fail "apkovl MISSING /etc/hostname (ISO will boot as 'localhost')"
+        fi
+        if grep -q './etc/network/interfaces' "$TMP/apkovl-list.txt"; then
+            pass "apkovl has /etc/network/interfaces"
+        else
+            fail "apkovl MISSING /etc/network/interfaces (networking fails at boot)"
+        fi
 
-# runlevel symlinks must be present
-for l in "./etc/runlevels/default/networking" "./etc/runlevels/default/seatd"; do
-    if grep -qF "$l" "$TMP/apkovl-list.txt"; then
-        pass "apkovl has $l"
-    else
-        fail "apkovl MISSING $l"
-    fi
-done
+        # runlevel symlinks must be present
+        for l in "./etc/runlevels/default/networking" "./etc/runlevels/default/seatd"; do
+            if grep -qF "$l" "$TMP/apkovl-list.txt"; then
+                pass "apkovl has $l"
+            else
+                fail "apkovl MISSING $l"
+            fi
+        done
+        ;;
+    *vps*|*gateway*)
+        # VPS ISO: headless i2pd gateway (no GUI, no autologin)
+        assert_contains "$TMP/apkovl-list.txt" "trusttunnel_endpoint" "apkovl has trusttunnel_endpoint"
+        assert_contains "$TMP/apkovl-list.txt" "setup_wizard" "apkovl has setup_wizard"
+        assert_contains "$TMP/apkovl-list.txt" "./etc/i2pd/i2pd.conf" "apkovl has i2pd.conf"
+        assert_contains "$TMP/apkovl-list.txt" "./etc/nftables.nft" "apkovl has nftables.nft"
+        for l in "./etc/runlevels/default/i2pd" "./etc/runlevels/default/networking"; do
+            if grep -qF "$l" "$TMP/apkovl-list.txt"; then
+                pass "apkovl has $l"
+            else
+                fail "apkovl MISSING $l"
+            fi
+        done
+        ;;
+    *) fail "unknown ISO type: $ISO" ;;
+esac
 
 # For the client ISO, verify the autologin + start-river wiring in the actual
 # shipped files (not just the source tree).
