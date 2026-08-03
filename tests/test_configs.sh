@@ -75,6 +75,30 @@ assert_contains "$REPO_ROOT/client/configs/start-river" 'river &>/tmp/river.log'
 assert_contains "$REPO_ROOT/client/configs/start-river" 'WLR_RENDERER=pixman' \
     "start-river uses pixman renderer (no GPU in VM)"
 
+group "Config syntax: LibreWolf dark mode"
+# The GUI ships dark-by-default. Two layers must both be asserted: the
+# config must force the browser chrome/theme to dark (ui.systemUsesDarkTheme)
+# AND darken web content (prefers-color-scheme + Dark Reader). A config that
+# only sets the Dark Reader extension pref leaves the chrome rendering light.
+OVERRIDES="$REPO_ROOT/client/configs/librewolf.overrides.cfg"
+assert_contains "$OVERRIDES" 'ui.systemUsesDarkTheme", 1' \
+    "LibreWolf forces the browser chrome to the dark theme"
+assert_contains "$OVERRIDES" 'layout.css.prefers-color-scheme.content", 3' \
+    "LibreWolf forces web content to prefers-color-scheme: dark"
+assert_contains "$OVERRIDES" 'extensions.darkreader.enableByDefault", true' \
+    "Dark Reader is enabled by default"
+# The Dark Reader extension must actually ship on the ISO, not just be
+# referenced in prefs.
+if [ -f "$REPO_ROOT/client/extensions/addon@darkreader.org.xpi" ]; then
+    pass "Dark Reader xpi ships in client/extensions"
+else
+    fail "Dark Reader xpi missing from client/extensions"
+fi
+assert_contains "$REPO_ROOT/client/configs/policies.json" 'addon@darkreader.org' \
+    "policies.json force-installs Dark Reader"
+assert_contains "$REPO_ROOT/client/configs/librewolf-launcher" 'librewolf.overrides.cfg' \
+    "librewolf-launcher copies overrides into session profile"
+
 group "Config syntax: wallpaper wiring"
 assert_contains "$REPO_ROOT/client/configs/river_init" 'swaybg -i /etc/wallpaper/wallpaper.png' \
     "river_init references wallpaper.png (not .avif - GdkPixbuf can't decode AVIF)"
@@ -93,6 +117,7 @@ group "Config syntax: pentest build pipeline"
 # Most pentest packages live in edge/testing; the build must add that repo.
 assert_contains "$WORLD" 'alpine/edge/testing' "assemble-iso adds edge/testing repo"
 assert_contains "$WORLD" 'pentest-apks.list' "assemble-iso appends pentest-apks.list to world"
+assert_contains "$WORLD" 'pentest-lazy.list' "assemble-iso excludes pentest-lazy.list from world"
 # The mkimg profile reads the pentest apk list into the ISO apk cache.
 assert_contains "$REPO_ROOT/client/configs/mkimg.myi2pd.sh" 'pentest-apks.list' \
     "mkimg profile bakes pentest apks into ISO cache"
@@ -102,18 +127,33 @@ assert_contains "$REPO_ROOT/client/configs/mkimg.myi2pd.sh" "sed -e 's/#.*//'" \
     "mkimg profile strips comments from pentest-apks.list"
 assert_contains "$REPO_ROOT/client/configs/assemble-iso" "sed -e 's/#.*//'" \
     "assemble-iso strips comments when appending to world"
-# Build scripts (local + CI) must ship the two pentest files into the overlay.
+# Build scripts (local + CI) must ship the three pentest files into the overlay.
 for f in "$REPO_ROOT/client/build_iso.sh" "$REPO_ROOT/.github/workflows/build.yml"; do
     assert_contains "$f" 'pentest-apks.list' "$(basename "$f") copies pentest-apks.list"
+    assert_contains "$f" 'pentest-lazy.list' "$(basename "$f") copies pentest-lazy.list"
     assert_contains "$f" 'pentest-extra.sh' "$(basename "$f") copies pentest-extra.sh"
 done
-# gcc must never be requested; clang20 is the compiler.
+# gcc must never be requested; clang20 is the compiler (lazy-loaded).
 if grep -E '^gcc$' "$REPO_ROOT/client/configs/pentest-apks.list"; then
     fail "pentest-apks.list must not contain gcc"
 else
     pass "pentest-apks.list has no gcc (uses clang20)"
 fi
 assert_contains "$REPO_ROOT/client/configs/pentest-apks.list" '^clang20$' "pentest list pins clang20"
+# Every lazy-loaded package must exist in the full ISO-cache list (else the apk
+# add at runtime would fail - the .apk would not be on the ISO).
+if [ -f "$REPO_ROOT/client/configs/pentest-lazy.list" ]; then
+    while IFS= read -r pkg; do
+        case "$pkg" in ''|\#*) continue ;; esac
+        if grep -qx "$pkg" "$REPO_ROOT/client/configs/pentest-apks.list"; then
+            pass "lazy pkg $pkg present in pentest-apks.list (ISO cache)"
+        else
+            fail "lazy pkg $pkg missing from pentest-apks.list - not on ISO, cannot lazy-load"
+        fi
+    done < "$REPO_ROOT/client/configs/pentest-lazy.list"
+else
+    fail "pentest-lazy.list missing"
+fi
 # pypykatz: pure-Python Mimikatz, pip-installed (Alpine package pins old python).
 assert_contains "$REPO_ROOT/client/configs/pentest-extra.sh" 'pypykatz' \
     "pentest-extra.sh pip-installs pypykatz"
