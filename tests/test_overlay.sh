@@ -110,6 +110,8 @@ assert_executable "$CLIENT_OVERLAY/usr/local/bin/pentest-extra.sh" "client pente
 assert_file "$CLIENT_OVERLAY/etc/pentest-lazy.list" "client pentest-lazy.list exists"
 assert_contains "$CLIENT_OVERLAY/usr/local/bin/pentest-extra.sh" 'pentest-lazy.list' \
     "pentest-extra.sh reads pentest-lazy.list"
+assert_contains "$CLIENT_OVERLAY/usr/local/bin/pentest-extra.sh" 'LIG_ASSET=' \
+    "ligolo-ng asset name strips leading v"
 
 # --- nftables + trusttunnel configs ---
 assert_file "$CLIENT_OVERLAY/etc/nftables/nftables.nft" "client nftables.nft exists"
