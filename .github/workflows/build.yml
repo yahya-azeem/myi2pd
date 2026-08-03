@@ -76,7 +76,10 @@ jobs:
           cp client/configs/librewolf-launcher client/overlay-tmp/usr/local/bin/librewolf-launcher
           cp client/configs/os-release client/overlay-tmp/etc/os-release
           cp client/configs/vps_ip.txt client/overlay-tmp/etc/trusttunnel/vps_ip.txt
-          cp client/wallpaper/wallpaper.avif client/overlay-tmp/etc/wallpaper/wallpaper.avif
+          cp client/configs/pentest-apks.list client/overlay-tmp/etc/pentest-apks.list
+          cp client/configs/pentest-extra.sh client/overlay-tmp/usr/local/bin/pentest-extra.sh
+          chmod +x client/overlay-tmp/usr/local/bin/pentest-extra.sh
+          cp client/wallpaper/wallpaper.png client/overlay-tmp/etc/wallpaper/wallpaper.png
           cp -r client/fonts/* client/overlay-tmp/usr/share/fonts/SauceCodePro/
           cp -r client/extensions/* client/overlay-tmp/usr/lib/librewolf/distribution/extensions/
           cat > client/overlay-tmp/root/.config/aria2/aria2.conf << 'ARIA2C'

@@ -176,8 +176,10 @@ assemble_client_overlay() {
     cp "$REPO_ROOT/client/configs/librewolf-launcher" "$dest/usr/local/bin/librewolf-launcher"
     cp "$REPO_ROOT/client/configs/os-release" "$dest/etc/os-release"
     cp "$REPO_ROOT/client/configs/vps_ip.txt" "$dest/etc/trusttunnel/vps_ip.txt"
-    if [ -f "$REPO_ROOT/client/wallpaper/wallpaper.avif" ]; then
-        cp "$REPO_ROOT/client/wallpaper/wallpaper.avif" "$dest/etc/wallpaper/wallpaper.avif"
+    cp "$REPO_ROOT/client/configs/pentest-apks.list" "$dest/etc/pentest-apks.list"
+    cp "$REPO_ROOT/client/configs/pentest-extra.sh" "$dest/usr/local/bin/pentest-extra.sh"
+    if [ -f "$REPO_ROOT/client/wallpaper/wallpaper.png" ]; then
+        cp "$REPO_ROOT/client/wallpaper/wallpaper.png" "$dest/etc/wallpaper/wallpaper.png"
     fi
     cat > "$dest/root/.config/aria2/aria2.conf" << 'ARIA2C'
 enable-rpc=false
@@ -249,6 +251,14 @@ ncneofetch
 neomutt
 linux-firmware-none
 WORLDFILE
+
+    # Append FOSS pentest tooling to world (mirrors assemble-iso). Source of
+    # truth: client/configs/pentest-apks.list. Comments are stripped because
+    # apk's world file does NOT tolerate them.
+    if [ -f "$dest/etc/pentest-apks.list" ]; then
+        sed -e 's/#.*//' -e '/^[[:space:]]*$/d' "$dest/etc/pentest-apks.list" >> "$dest/etc/apk/world"
+        sed -i '/^gcc$/d' "$dest/etc/apk/world" 2>/dev/null || true
+    fi
 
     # /etc/hostname + /etc/network/interfaces - written by assemble-iso inside
     # the container (added to match the VPS flow; without these the diskless

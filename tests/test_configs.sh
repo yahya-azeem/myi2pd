@@ -9,10 +9,10 @@ group "Config syntax: client shell scripts"
 for f in "$REPO_ROOT"/client/configs/*.sh "$REPO_ROOT"/client/configs/start-river \
          "$REPO_ROOT"/client/configs/assemble-iso "$REPO_ROOT"/client/configs/hdd-isolation \
          "$REPO_ROOT"/client/configs/autologin "$REPO_ROOT"/client/configs/genapkovl-myi2pd.sh \
-         "$REPO_ROOT"/client/configs/i2p-keepalive.sh; do
+         "$REPO_ROOT"/client/configs/i2p-keepalive.sh "$REPO_ROOT"/client/configs/pentest-extra.sh; do
     [ -f "$f" ] || continue
     case "$f" in
-        *.sh|start-river|assemble-iso|hdd-isolation|autologin) assert_shell_syntax "$f" "sh syntax: $(basename "$f")" ;;
+        *.sh|start-river|assemble-iso|hdd-isolation|autologin|pentest-extra.sh) assert_shell_syntax "$f" "sh syntax: $(basename "$f")" ;;
     esac
 done
 
@@ -75,6 +75,12 @@ assert_contains "$REPO_ROOT/client/configs/start-river" 'river &>/tmp/river.log'
 assert_contains "$REPO_ROOT/client/configs/start-river" 'WLR_RENDERER=pixman' \
     "start-river uses pixman renderer (no GPU in VM)"
 
+group "Config syntax: wallpaper wiring"
+assert_contains "$REPO_ROOT/client/configs/river_init" 'swaybg -i /etc/wallpaper/wallpaper.png' \
+    "river_init references wallpaper.png (not .avif - GdkPixbuf can't decode AVIF)"
+assert_contains "$REPO_ROOT/client/configs/river_init" '-m fill' \
+    "river_init fills screen with wallpaper"
+
 group "Config syntax: apk world packages"
 # World file must be non-empty and list agetty (autologin) + river (GUI).
 WORLD="$REPO_ROOT/client/configs/assemble-iso"
@@ -82,6 +88,26 @@ assert_contains "$WORLD" 'river-classic' "world includes river-classic"
 assert_contains "$WORLD" 'agetty' "world includes agetty"
 assert_contains "$WORLD" 'seatd' "world includes seatd"
 assert_contains "$WORLD" 'librewolf' "world includes librewolf"
+
+group "Config syntax: pentest build pipeline"
+# Most pentest packages live in edge/testing; the build must add that repo.
+assert_contains "$WORLD" 'alpine/edge/testing' "assemble-iso adds edge/testing repo"
+assert_contains "$WORLD" 'pentest-apks.list' "assemble-iso appends pentest-apks.list to world"
+# The mkimg profile reads the pentest apk list into the ISO apk cache.
+assert_contains "$REPO_ROOT/client/configs/mkimg.myi2pd.sh" 'pentest-apks.list' \
+    "mkimg profile bakes pentest apks into ISO cache"
+# Build scripts (local + CI) must ship the two pentest files into the overlay.
+for f in "$REPO_ROOT/client/build_iso.sh" "$REPO_ROOT/.github/workflows/build.yml"; do
+    assert_contains "$f" 'pentest-apks.list' "$(basename "$f") copies pentest-apks.list"
+    assert_contains "$f" 'pentest-extra.sh' "$(basename "$f") copies pentest-extra.sh"
+done
+# gcc must never be requested; clang20 is the compiler.
+if grep -E '^gcc$' "$REPO_ROOT/client/configs/pentest-apks.list"; then
+    fail "pentest-apks.list must not contain gcc"
+else
+    pass "pentest-apks.list has no gcc (uses clang20)"
+fi
+assert_contains "$REPO_ROOT/client/configs/pentest-apks.list" '^clang20$' "pentest list pins clang20"
 
 summary
 exit $?

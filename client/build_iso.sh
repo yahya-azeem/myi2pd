@@ -72,9 +72,9 @@ if [ -f "$WORKSPACE_DIR/extensions/addon@darkreader.org.xpi" ]; then
 fi
 
 # Install wallpaper
-if [ -f "$WORKSPACE_DIR/wallpaper/wallpaper.avif" ]; then
+if [ -f "$WORKSPACE_DIR/wallpaper/wallpaper.png" ]; then
     echo "Installing wallpaper..."
-    cp "$WORKSPACE_DIR/wallpaper/wallpaper.avif" "$OVERLAY_TMP/etc/wallpaper/wallpaper.avif"
+    cp "$WORKSPACE_DIR/wallpaper/wallpaper.png" "$OVERLAY_TMP/etc/wallpaper/wallpaper.png"
 fi
 
 # Custom OS release for myi2pd distro identity
@@ -130,6 +130,13 @@ if [ -f "$WORKSPACE_DIR/configs/vps_ip.txt" ]; then
     echo "Pre-configuring ISO with VPS IP: $(cat $WORKSPACE_DIR/configs/vps_ip.txt)"
     cp "$WORKSPACE_DIR/configs/vps_ip.txt" "$OVERLAY_TMP/etc/trusttunnel/vps_ip.txt"
 fi
+
+# FOSS pentest tooling: Alpine apk list (baked) + on-demand heavy installer.
+# The apk list is appended to /etc/apk/world by assemble-iso inside the
+# container; pentest-extra.sh installs the non-Alpine tools at runtime.
+cp "$WORKSPACE_DIR/configs/pentest-apks.list" "$OVERLAY_TMP/etc/pentest-apks.list"
+cp "$WORKSPACE_DIR/configs/pentest-extra.sh" "$OVERLAY_TMP/usr/local/bin/pentest-extra.sh"
+chmod +x "$OVERLAY_TMP/usr/local/bin/pentest-extra.sh"
 
 # Create dummy hostname
 echo "myi2pd" > "$OVERLAY_TMP/etc/hostname"

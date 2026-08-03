@@ -69,6 +69,21 @@ neomutt
 linux-firmware-none
 WORLDFILE
 
+# Append FOSS pentest tooling (Alpine-packaged) to the world file. These are
+# the lightweight tools; the heavy ones (netexec, sliver, evil-winrm, ...) are
+# installed on demand by /usr/local/bin/pentest-extra.sh to keep the amnesiac
+# RAM footprint small. Source of truth: client/configs/pentest-apks.list
+if [ -f /build/overlay/etc/pentest-apks.list ]; then
+    echo "=== Appending pentest apks to world ==="
+    # Strip comments/blank lines: apk's world file does NOT tolerate them.
+    sed -e 's/#.*//' -e '/^[[:space:]]*$/d' /build/overlay/etc/pentest-apks.list \
+        >> /build/overlay/etc/apk/world
+    # clang20 is installed (not gcc). Explicitly guard: gcc must never land in world.
+    grep -q '^gcc$' /build/overlay/etc/apk/world && \
+        sed -i '/^gcc$/d' /build/overlay/etc/apk/world && \
+        echo "removed stray gcc from world" || true
+fi
+
 # hostname
 echo "myi2pd" > /build/overlay/etc/hostname
 
@@ -112,6 +127,7 @@ heartbeat_pid=$!
 sh mkimage.sh --profile myi2pd \
   --repository https://dl-cdn.alpinelinux.org/alpine/edge/main \
   --repository https://dl-cdn.alpinelinux.org/alpine/edge/community \
+  --repository https://dl-cdn.alpinelinux.org/alpine/edge/testing \
   --outdir /build --hostkeys
 kill "$heartbeat_pid" 2>/dev/null || true
 

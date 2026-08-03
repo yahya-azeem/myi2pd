@@ -59,9 +59,41 @@ for pkg in river-classic seatd dbus librewolf fuzzel waybar foot agetty; do
     assert_contains "$CLIENT_OVERLAY/etc/apk/world" "^$pkg\$" "client world pkg: $pkg"
 done
 
+# --- FOSS pentest tooling ---
+# Alpine-packaged tools must be in world (baked into the ISO).
+for pkg in ffuf sqlmap hashcat gitleaks nuclei httpx naabu katana rustscan \
+           mitmproxy rizin pypykatz py3-impacket; do
+    assert_contains "$CLIENT_OVERLAY/etc/apk/world" "^$pkg\$" "client world pentest: $pkg"
+done
+
+# python + clang preinstalled, explicitly NO gcc.
+assert_contains "$CLIENT_OVERLAY/etc/apk/world" "^python3\$" "client world: python3 present"
+assert_contains "$CLIENT_OVERLAY/etc/apk/world" "^py3-pip\$" "client world: pip present"
+assert_contains "$CLIENT_OVERLAY/etc/apk/world" "^clang20\$" "client world: clang20 present"
+if grep -q '^gcc$' "$CLIENT_OVERLAY/etc/apk/world"; then
+    fail "client world must NOT contain gcc"
+else
+    pass "client world has no gcc"
+fi
+
+# On-demand heavy tools installer ships in the overlay.
+assert_file "$CLIENT_OVERLAY/usr/local/bin/pentest-extra.sh" "client pentest-extra.sh exists"
+assert_executable "$CLIENT_OVERLAY/usr/local/bin/pentest-extra.sh" "client pentest-extra.sh executable"
+
 # --- nftables + trusttunnel configs ---
 assert_file "$CLIENT_OVERLAY/etc/nftables/nftables.nft" "client nftables.nft exists"
 assert_file "$CLIENT_OVERLAY/etc/trusttunnel/vps_ip.txt" "client vps_ip.txt exists"
+
+# --- wallpaper must be in a swaybg/GdkPixbuf-decodable format ---
+# swaybg loads via GdkPixbuf, which has NO AVIF decoder; an .avif wallpaper
+# silently fails to render. PNG is lossless and always supported.
+assert_file "$CLIENT_OVERLAY/etc/wallpaper/wallpaper.png" "client wallpaper.png exists"
+if [ -f "$CLIENT_OVERLAY/etc/wallpaper/wallpaper.png" ] && \
+   [ "$(od -An -N8 -tx1 "$CLIENT_OVERLAY/etc/wallpaper/wallpaper.png" | tr -d ' \n')" = "89504e470d0a1a0a" ]; then
+    pass "client wallpaper is PNG (GdkPixbuf-decodable)"
+else
+    fail "client wallpaper not PNG - swaybg cannot render it (use PNG, not AVIF)"
+fi
 
 # ---------------------------------------------------------------------------
 # VPS overlay
