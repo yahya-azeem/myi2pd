@@ -64,6 +64,11 @@ done
 for pkg in ffuf sqlmap gitleaks rustscan mitmproxy rizin py3-impacket; do
     assert_contains "$CLIENT_OVERLAY/etc/apk/world" "^$pkg\$" "client world pentest: $pkg"
 done
+# pentest-extra.sh hard-requires curl + zstd at runtime; both are tiny and must
+# be baked into world (they used to arrive transitively via the heavy tools).
+for pkg in curl zstd; do
+    assert_contains "$CLIENT_OVERLAY/etc/apk/world" "^$pkg\$" "client world pentest runtime dep: $pkg"
+done
 # Heavy tools are shipped on the ISO's on-disk repository but NOT in world - if
 # they were in world they'd extract into RAM at boot and overflow the diskless
 # tmpfs root (the reason the desktop didn't launch at 4G). They load on demand
