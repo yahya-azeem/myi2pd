@@ -95,3 +95,31 @@ chmod +x shared/test_vm.sh
 ./shared/test_vm.sh
 ```
 This script attaches a blank dummy drive to verify that `hdd-isolation` successfully locks write permission requests at the OS kernel layer.
+
+---
+
+## Fast Bootless Tests (no VM, no ISO build)
+
+Rebuilding the ISO and booting it under QEMU takes ~30 minutes, so config
+changes are validated by a sub-second static suite instead. It checks shell
+syntax, nftables/inittab validity, overlay file integrity (hostname, network
+interfaces, autologin, river/foot/waybar, nftables, trusttunnel), and that the
+GitHub Actions pipeline produces the exact same overlay as the local
+`client/build_iso.sh` — catching a "works locally, broken in CI" regression
+before you ever boot a VM.
+
+```bash
+make test        # full suite (validates a built ISO if one is in repo root)
+make test-quick  # skip ISO artifact validation (fastest, ~2s)
+make test-iso ISO=myi2pd-amnesiac.iso   # validate a built ISO's apkovl only
+```
+
+The suite runs automatically on every commit via a pre-commit hook:
+
+```bash
+make pre-commit  # installs .githooks/pre-commit (one-time per clone)
+```
+
+It is also wired into CI (`.github/workflows/test.yml`): `static-tests` runs
+the suite on every push/PR, and `iso-validation` builds the ISO and validates
+its apkovl on push/workflow_dispatch.

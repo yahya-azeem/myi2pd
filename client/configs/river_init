@@ -82,8 +82,8 @@ riverctl map normal $MOD+Shift E exit
 riverctl map normal $MOD W spawn "foot -T 'myi2pd Wi-Fi Connection Setup' /usr/local/bin/wifi-connect.sh"
 
 # -- Wallpaper --
-if [ -f /etc/wallpaper/wallpaper.avif ]; then
-    swaybg -i /etc/wallpaper/wallpaper.avif -m fill >/dev/null 2>&1 &
+if [ -f /etc/wallpaper/wallpaper.png ]; then
+    swaybg -i /etc/wallpaper/wallpaper.png -m fill >/dev/null 2>&1 &
 else
     swaybg -c '#0e1218' &
 fi

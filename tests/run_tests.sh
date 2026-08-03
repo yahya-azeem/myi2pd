@@ -8,6 +8,7 @@
 #   tests/run_tests.sh                 # run all tests (no ISO = skips iso test)
 #   tests/run_tests.sh -v              # verbose per-test output
 #   tests/run_tests.sh -i <iso>        # also validate a built ISO artifact
+#   tests/run_tests.sh --no-iso        # never run the iso test, even if ISOs exist
 #   tests/run_tests.sh --only overlay  # run one test file by name
 #
 # Suggested in CI / pre-commit:
@@ -20,11 +21,13 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 ISO_ARG=""
 ONLY=""
 VERBOSE=0
+NO_ISO=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
         -v|--verbose) VERBOSE=1 ;;
         -i|--iso) shift; ISO_ARG="${1:-}" ;;
+        --no-iso) NO_ISO=1 ;;
         --only) shift; ONLY="${1:-}" ;;
         *) echo "Unknown option: $1" >&2; exit 2 ;;
     esac
@@ -60,7 +63,9 @@ run_test "$SCRIPT_DIR/test_overlay.sh"
 run_test "$SCRIPT_DIR/test_gha_parity.sh"
 run_test "$SCRIPT_DIR/test_configs.sh"
 
-if [ -n "$ISO_ARG" ]; then
+if [ "$NO_ISO" -eq 1 ]; then
+    : # iso test explicitly skipped
+elif [ -n "$ISO_ARG" ]; then
     run_test "$SCRIPT_DIR/test_iso.sh"
 elif [ -f "$REPO_ROOT/myi2pd-amnesiac.iso" ] || [ -f "$REPO_ROOT/myi2pd-vps.iso" ]; then
     echo ">>> Found ISO(s) in repo root, running ISO smoke test."
