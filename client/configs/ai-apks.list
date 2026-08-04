@@ -12,5 +12,5 @@
 # Source of truth: /etc/ai-apks.list (copied verbatim by build pipelines).
 docker
 docker-cli
-docker-buildx
-docker-compose
+docker-cli-buildx
+docker-cli-compose

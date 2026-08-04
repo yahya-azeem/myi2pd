@@ -56,7 +56,10 @@ COPY --from=base /tmp/bin/ollama /bin/ollama
 COPY --from=base /tmp/lib/ollama /lib/ollama
 
 FROM cgr.dev/chainguard/wolfi-base:latest AS final
-RUN apk add --no-cache ca-certificates tzdata
+# libstdc++ is required by the ollama binary and its llama-server CUDA/Vulkan
+# backends (C++ runtime); wolfi-base already brings glibc. libgomp is provided
+# by the ollama tarball's lib/ollama (/lib/../libgomp.so.*) so we do not need it.
+RUN apk add --no-cache ca-certificates tzdata libstdc++
 
 COPY --from=payload /bin/ollama /usr/bin/ollama
 COPY --from=payload /lib/ollama /usr/lib/ollama

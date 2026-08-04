@@ -165,6 +165,17 @@ assert_file "$AI_EXTRA" "ai-extra.sh exists"
 # ONLY on demand, never into the 4G tmpfs root at boot.
 assert_file "$REPO_ROOT/client/configs/ai-apks.list" "ai-apks.list exists"
 assert_contains "$REPO_ROOT/client/configs/ai-apks.list" 'docker' "ai list loads docker"
+# The docker toolbox package names MUST be valid Alpine edge packages: it is
+# docker-cli-buildx / docker-cli-compose, NOT docker-buildx / docker-compose
+# (a wrong name makes `apk add` fail and the whole ISO build exit 1 - seen in CI).
+for bad in 'docker-buildx' 'docker-compose'; do
+    assert_not_contains "$REPO_ROOT/client/configs/ai-apks.list" "$bad" \
+        "ai list avoids invalid pkg name: $bad"
+done
+assert_contains "$REPO_ROOT/client/configs/ai-apks.list" 'docker-cli-buildx' \
+    "ai list uses docker-cli-buildx (valid Alpine pkg)"
+assert_contains "$REPO_ROOT/client/configs/ai-apks.list" 'docker-cli-compose' \
+    "ai list uses docker-cli-compose (valid Alpine pkg)"
 # The mkimg profile bakes the docker apks into the ISO on-disk cache (offline).
 assert_contains "$REPO_ROOT/client/configs/mkimg.myi2pd.sh" 'ai-apks.list' \
     "mkimg profile bakes ai-apks into ISO cache"
