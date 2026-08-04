@@ -11,13 +11,20 @@
 #   ./client/ai/build_ollama_squashfs.sh [--backends cpu|false] [--out FILE]
 #
 # Produces: myi2pd-ollama.squashfs  (loop-mountable, read-only, on-demand)
+#
+# This is FAST and light in CI: the Dockerfile fetches the standalone Ollama
+# release tarball (~1.4GB) directly via curl, NOT the 8GB official docker
+# image, so the pull that once pinned the runner disk no longer happens. The
+# tarball layer is cached by buildkit (cache-from: type=gha) across runs.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 OUT="${REPO_ROOT}/myi2pd-ollama.squashfs"
-BACKENDS="false"   # false = all backends (CPU+NVIDIA+AMD); cpu = CPU only
+# false = keep everything the base tarball ships (cpu + cuda_v12 + cuda_v13 +
+# vulkan); cpu = smallest (CPU only); or "cpu cuda_v13" to keep a subset.
+BACKENDS="false"
 
 while [ $# -gt 0 ]; do
     case "$1" in

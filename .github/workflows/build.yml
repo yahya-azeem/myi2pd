@@ -132,11 +132,26 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build + pack Ollama squashfs
+      - name: Build Ollama container (cached in GHA)
+        # The Dockerfile downloads the standalone ollama-linux-amd64.tar.zst
+        # (~1.4GB), NOT the 8GB official image. buildx conserves that tarball
+        # layer across runs via gha cache, so the ~2GB fetch+extract happens
+        # only once, then builds complete in seconds.
+        uses: docker/build-push-action@v6
+        with:
+          context: client/ai/ollama
+          file: client/ai/ollama/Dockerfile
+          build-args: OLLAMA_BACKENDS=false
+          tags: myi2pd-ollama:latest
+          load: true
+          cache-from: type=gha,scope=ollama
+          cache-to: type=gha,scope=ollama,mode=max
+
+      - name: Pack + upload Ollama squashfs
         run: |
           sudo apt-get update && sudo apt-get install -y squashfs-tools
-          chmod +x client/ai/build_ollama_squashfs.sh
-          ./client/ai/build_ollama_squashfs.sh --backends false --out myi2pd-ollama.squashfs
+          mkdir -p /tmp/ollama-sq && docker save myi2pd-ollama:latest -o /tmp/ollama-sq/ollama-image.tar
+          mksquashfs /tmp/ollama-sq/ollama-image.tar myi2pd-ollama.squashfs -noappend -quiet
 
       - uses: actions/upload-artifact@v4
         with:

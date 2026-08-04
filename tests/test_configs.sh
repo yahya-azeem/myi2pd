@@ -200,6 +200,16 @@ OLL_DOCKER="$REPO_ROOT/client/ai/ollama/Dockerfile"
 assert_file "$OLL_DOCKER" "Ollama container Dockerfile exists"
 assert_contains "$OLL_DOCKER" 'chainguard/wolfi-base' "Ollama Dockerfile uses Wolfi glibc base"
 assert_not_contains "$OLL_DOCKER" 'ubuntu:24.04' "Ollama Dockerfile avoids the heavy ubuntu base"
+# It must fetch the standalone release tarball, NOT the 8GB official docker
+# image - pulling that was what pinned the runner disk in CI.
+assert_contains "$OLL_DOCKER" 'ollama-linux-amd64.tar.zst' \
+    "Ollama Dockerfile downloads the standalone tar.zst release"
+assert_contains "$OLL_DOCKER" 'zstd -dc' "Ollama Dockerfile extracts the zst tarball"
+assert_not_contains "$OLL_DOCKER" 'FROM ollama/ollama' \
+    "Ollama Dockerfile never pulls the 8GB official image"
+# The tarball's lib/ollama/ tree is what we layer onto Wolfi.
+assert_contains "$OLL_DOCKER" 'cuda_v12' "Ollama Dockerfile keeps NVIDIA CUDA v12 backend"
+assert_contains "$OLL_DOCKER" 'vulkan' "Ollama Dockerfile keeps Vulkan backend (AMD/Intel)"
 # Squashfs builder script exists and calls mksquashfs.
 assert_file "$REPO_ROOT/client/ai/build_ollama_squashfs.sh" "squashfs builder exists"
 assert_contains "$REPO_ROOT/client/ai/build_ollama_squashfs.sh" 'mksquashfs' \
