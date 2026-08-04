@@ -113,6 +113,14 @@ assert_contains "$CLIENT_OVERLAY/usr/local/bin/pentest-extra.sh" 'pentest-lazy.l
 assert_contains "$CLIENT_OVERLAY/usr/local/bin/pentest-extra.sh" 'LIG_ASSET=' \
     "ligolo-ng asset name strips leading v"
 
+# On-demand AI stack (Docker/Ollama/Claurst) ships in the overlay.
+assert_file "$CLIENT_OVERLAY/usr/local/bin/ai-extra.sh" "client ai-extra.sh exists"
+assert_executable "$CLIENT_OVERLAY/usr/local/bin/ai-extra.sh" "client ai-extra.sh executable"
+assert_file "$CLIENT_OVERLAY/etc/ai-apks.list" "client ai-apks.list exists"
+assert_file "$CLIENT_OVERLAY/usr/local/share/myi2pd/CLAUDE.md" "client agent context CLAUDE.md exists"
+assert_contains "$CLIENT_OVERLAY/usr/local/share/myi2pd/CLAUDE.md" 'amnesiac' \
+    "client agent context documents amnesiac environment"
+
 # --- nftables + trusttunnel configs ---
 assert_file "$CLIENT_OVERLAY/etc/nftables/nftables.nft" "client nftables.nft exists"
 assert_file "$CLIENT_OVERLAY/etc/trusttunnel/vps_ip.txt" "client vps_ip.txt exists"

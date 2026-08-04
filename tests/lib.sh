@@ -179,6 +179,9 @@ assemble_client_overlay() {
     cp "$REPO_ROOT/client/configs/pentest-apks.list" "$dest/etc/pentest-apks.list"
     cp "$REPO_ROOT/client/configs/pentest-lazy.list" "$dest/etc/pentest-lazy.list"
     cp "$REPO_ROOT/client/configs/pentest-extra.sh" "$dest/usr/local/bin/pentest-extra.sh"
+    cp "$REPO_ROOT/client/configs/ai-apks.list" "$dest/etc/ai-apks.list"
+    cp "$REPO_ROOT/client/configs/ai-extra.sh" "$dest/usr/local/bin/ai-extra.sh"
+    cp "$REPO_ROOT/client/configs/AGENTS.md" "$dest/usr/local/share/myi2pd/CLAUDE.md"
     if [ -f "$REPO_ROOT/client/wallpaper/wallpaper.png" ]; then
         cp "$REPO_ROOT/client/wallpaper/wallpaper.png" "$dest/etc/wallpaper/wallpaper.png"
     fi

@@ -158,6 +158,56 @@ fi
 assert_contains "$REPO_ROOT/client/configs/pentest-extra.sh" 'pypykatz' \
     "pentest-extra.sh pip-installs pypykatz"
 
+group "Config syntax: on-demand AI stack (Docker/Ollama/Claurst)"
+AI_EXTRA="$REPO_ROOT/client/configs/ai-extra.sh"
+assert_file "$AI_EXTRA" "ai-extra.sh exists"
+# The AI runtime stack (docker toolbox) ships as a lazy apk list so it installs
+# ONLY on demand, never into the 4G tmpfs root at boot.
+assert_file "$REPO_ROOT/client/configs/ai-apks.list" "ai-apks.list exists"
+assert_contains "$REPO_ROOT/client/configs/ai-apks.list" 'docker' "ai list loads docker"
+# The mkimg profile bakes the docker apks into the ISO on-disk cache (offline).
+assert_contains "$REPO_ROOT/client/configs/mkimg.myi2pd.sh" 'ai-apks.list' \
+    "mkimg profile bakes ai-apks into ISO cache"
+# assemble-iso strips comments when it reads apk lists (Comment handling).
+assert_contains "$REPO_ROOT/client/configs/assemble-iso" "ai-apks.list" \
+    "assemble-iso references ai-apks.list"
+# Crucially it must NOT append the docker stack to world (would break the 4G boot).
+assert_not_contains "$REPO_ROOT/client/configs/assemble-iso" 'ai-apks.list.*>>.*world' \
+    "assemble-iso keeps ai-apks lazy (never appended to world)"
+# ai-extra.sh must load docker from the ISO repo, not assume internet.
+assert_contains "$AI_EXTRA" 'ai-apks.list' "ai-extra.sh reads ai-apks.list (offline docker)"
+assert_contains "$AI_EXTRA" '"myi2pd-ollama.squashfs"' "ai-extra.sh references the squashfs"
+assert_contains "$AI_EXTRA" 'docker load' "ai-extra.sh docker-loads the Ollama image"
+assert_contains "$AI_EXTRA" '--gpus all' "ai-extra.sh supports NVIDIA CUDA"
+assert_contains "$AI_EXTRA" '/dev/kfd' "ai-extra.sh supports AMD ROCm (kfd/dri)"
+assert_contains "$AI_EXTRA" 'install_claurst' "ai-extra.sh installs the Claurst agent"
+assert_contains "$AI_EXTRA" 'CLAUDE.md' "ai-extra.sh installs the ingrained agent context"
+# The agent context (CLAUDE.md/AGENTS.md) must prescribe the amnesiac restraints.
+AGENTS="$REPO_ROOT/client/configs/AGENTS.md"
+assert_file "$AGENTS" "agent context AGENTS.md exists"
+assert_contains "$AGENTS" 'amnesiac' "agent context knows it is amnesiac"
+assert_contains "$AGENTS" 'tmpfs' "agent context knows the root is tmpfs"
+assert_contains "$AGENTS" 'default-drop' "agent context knows the firewall is default-drop"
+assert_contains "$AGENTS" 'RAM' "agent context warns about memory limits"
+# Build script + CI must ship the AI files into the overlay.
+for f in "$REPO_ROOT/client/build_iso.sh" "$REPO_ROOT/.github/workflows/build.yml"; do
+    assert_contains "$f" 'ai-apks.list' "$(basename "$f") copies ai-apks.list"
+    assert_contains "$f" 'ai-extra.sh' "$(basename "$f") copies ai-extra.sh"
+    assert_contains "$f" 'AGENTS.md' "$(basename "$f") ships agent context"
+done
+# The Ollama container Dockerfile must use the tiny glibc base, not the Ubuntu one.
+OLL_DOCKER="$REPO_ROOT/client/ai/ollama/Dockerfile"
+assert_file "$OLL_DOCKER" "Ollama container Dockerfile exists"
+assert_contains "$OLL_DOCKER" 'chainguard/wolfi-base' "Ollama Dockerfile uses Wolfi glibc base"
+assert_not_contains "$OLL_DOCKER" 'ubuntu:24.04' "Ollama Dockerfile avoids the heavy ubuntu base"
+# Squashfs builder script exists and calls mksquashfs.
+assert_file "$REPO_ROOT/client/ai/build_ollama_squashfs.sh" "squashfs builder exists"
+assert_contains "$REPO_ROOT/client/ai/build_ollama_squashfs.sh" 'mksquashfs' \
+    "squashfs builder invokes mksquashfs"
+# CI produces + uploads the on-demand squashfs artifact.
+assert_contains "$REPO_ROOT/.github/workflows/build.yml" 'myi2pd-ollama.squashfs' \
+    "CI builds + uploads the Ollama squashfs artifact"
+
 summary
 exit $?
 

@@ -1,0 +1,16 @@
+# client/configs/ai-apks.list
+# Minimal container runtime (Docker) needed to run the on-demand Ollama GPU
+# container. These are LAZY-LOADED (like pentest-lazy.list): the .apk files are
+# baked into the ISO's on-disk repository so ai-extra.sh can install them OFFLINE
+# on demand, but they are NOT written to /etc/apk/world - they must never extract
+# into the 4G tmpfs root at boot.
+#
+# docker runs individually; together with the ollama squashfs it is a several-GB
+# disk footprint that would first blow boot RAM and then sit unused. It loads
+# only when /usr/local/bin/ai-extra.sh runs.
+#
+# Source of truth: /etc/ai-apks.list (copied verbatim by build pipelines).
+docker
+docker-cli
+docker-buildx
+docker-compose

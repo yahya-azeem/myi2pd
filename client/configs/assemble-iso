@@ -94,6 +94,15 @@ if [ -f /build/overlay/etc/pentest-apks.list ]; then
         echo "removed stray gcc from world" || true
 fi
 
+# The on-demand AI stack (Docker/Ollama/Claurst) is LAZY-LOADED, never baked
+# into world: the docker toolbox apks sit on the ISO disk (via mkimg reading
+# ai-apks.list) and are installed offline by ai-extra.sh only when local LLM
+# inference is requested. Nothing in ai-apks.list may end up in /etc/apk/world,
+# or it would extract into the 4G tmpfs root at every boot.
+if [ -f /build/overlay/etc/ai-apks.list ]; then
+    echo "=== ai-apks.list kept lazy (not added to world) ==="
+fi
+
 # hostname
 echo "myi2pd" > /build/overlay/etc/hostname
 

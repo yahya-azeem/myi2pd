@@ -141,6 +141,14 @@ cp "$WORKSPACE_DIR/configs/pentest-lazy.list" "$OVERLAY_TMP/etc/pentest-lazy.lis
 cp "$WORKSPACE_DIR/configs/pentest-extra.sh" "$OVERLAY_TMP/usr/local/bin/pentest-extra.sh"
 chmod +x "$OVERLAY_TMP/usr/local/bin/pentest-extra.sh"
 
+# On-demand AI stack: docker container runtime (lazy apk list), the Ollama/Claurst
+# on-demand loader, and the ingrained agent context (auto-loaded by Claurst as
+# CLAUDE.md). The Ollama image ships separately as myi2pd-ollama.squashfs.
+cp "$WORKSPACE_DIR/configs/ai-apks.list" "$OVERLAY_TMP/etc/ai-apks.list"
+cp "$WORKSPACE_DIR/configs/ai-extra.sh" "$OVERLAY_TMP/usr/local/bin/ai-extra.sh"
+chmod +x "$OVERLAY_TMP/usr/local/bin/ai-extra.sh"
+cp "$WORKSPACE_DIR/configs/AGENTS.md" "$OVERLAY_TMP/usr/local/share/myi2pd/CLAUDE.md"
+
 # Create dummy hostname
 echo "myi2pd" > "$OVERLAY_TMP/etc/hostname"
 

@@ -79,6 +79,9 @@ jobs:
           cp client/configs/pentest-apks.list client/overlay-tmp/etc/pentest-apks.list
           cp client/configs/pentest-lazy.list client/overlay-tmp/etc/pentest-lazy.list
           cp client/configs/pentest-extra.sh client/overlay-tmp/usr/local/bin/pentest-extra.sh
+          cp client/configs/ai-apks.list client/overlay-tmp/etc/ai-apks.list
+          cp client/configs/ai-extra.sh client/overlay-tmp/usr/local/bin/ai-extra.sh
+          cp client/configs/AGENTS.md client/overlay-tmp/usr/local/share/myi2pd/CLAUDE.md
           chmod +x client/overlay-tmp/usr/local/bin/pentest-extra.sh
           cp client/wallpaper/wallpaper.png client/overlay-tmp/etc/wallpaper/wallpaper.png
           cp -r client/fonts/* client/overlay-tmp/usr/share/fonts/SauceCodePro/
@@ -117,6 +120,28 @@ jobs:
         with:
           name: myi2pd-amnesiac
           path: myi2pd-amnesiac.iso
+
+  build-ollama-squashfs:
+    # The amnesiac client boots diskless into 4G tmpfs. The Ollama GPU container
+    # (CPU + NVIDIA + AMD) is shipped as a separate on-demand squashfs, NOT baked
+    # into the ISO root, so it loads only when ai-extra.sh mounts it.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build + pack Ollama squashfs
+        run: |
+          sudo apt-get update && sudo apt-get install -y squashfs-tools
+          chmod +x client/ai/build_ollama_squashfs.sh
+          ./client/ai/build_ollama_squashfs.sh --backends false --out myi2pd-ollama.squashfs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: myi2pd-ollama
+          path: myi2pd-ollama.squashfs
 
   build-vps:
     runs-on: ubuntu-latest
