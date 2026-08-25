@@ -121,9 +121,9 @@ assert_file "$CLIENT_OVERLAY/usr/local/share/myi2pd/CLAUDE.md" "client agent con
 assert_contains "$CLIENT_OVERLAY/usr/local/share/myi2pd/CLAUDE.md" 'amnesiac' \
     "client agent context documents amnesiac environment"
 
-# --- nftables + trusttunnel configs ---
+# --- nftables + VLESS client config dir (config generated at runtime) ---
 assert_file "$CLIENT_OVERLAY/etc/nftables/nftables.nft" "client nftables.nft exists"
-assert_file "$CLIENT_OVERLAY/etc/trusttunnel/vps_ip.txt" "client vps_ip.txt exists"
+assert_file "$CLIENT_OVERLAY/etc/xray" "client /etc/xray directory exists"
 
 # --- wallpaper must be in a swaybg/GdkPixbuf-decodable format ---
 # swaybg loads via GdkPixbuf, which has NO AVIF decoder; an .avif wallpaper
@@ -142,7 +142,9 @@ fi
 group "VPS overlay: required files"
 assemble_vps_overlay "$VPS_OVERLAY"
 mkdir -p "$VPS_OVERLAY/etc/i2pd" "$VPS_OVERLAY/etc/nftables" \
-         "$VPS_OVERLAY/etc/network" "$VPS_OVERLAY/etc/trusttunnel"
+         "$VPS_OVERLAY/etc/network" "$VPS_OVERLAY/etc/xray" \
+         "$VPS_OVERLAY/etc/init.d" \
+         "$VPS_OVERLAY/etc/trusttunnel"
 cp "$REPO_ROOT/vps/configs/i2pd.conf" "$VPS_OVERLAY/etc/i2pd/i2pd.conf"
 cp "$REPO_ROOT/vps/configs/nftables.nft" "$VPS_OVERLAY/etc/nftables/nftables.nft"
 
@@ -155,31 +157,73 @@ auto eth0
 iface eth0 inet dhcp
 EOF
 
+# Create xray init script (mirrors build_vps_iso.sh)
+cat > "$VPS_OVERLAY/etc/init.d/xray" << 'XRAYINIT'
+#!/sbin/openrc-run
+name="xray"
+description="Xray VLESS + XTLS-Reality Endpoint Daemon"
+command="/usr/local/bin/xray"
+command_args="-conf /etc/xray/config.json"
+command_background=true
+pidfile="/run/RC_SVCNAME.pid"
+depend() { need net; after nftables; }
+start_pre() {
+    [ -d /etc/xray ] || mkdir -p /etc/xray
+    [ -f /etc/xray/config.json ] || {
+        X25519=$(/usr/local/bin/xray x25519 | awk '{print $2}')
+        VLESS_UUID=$(/usr/local/bin/xray uuid)
+        SHORT_ID=$(xxd -l 8 -p /dev/urandom)
+        MLDSA65_SEED=$(/usr/local/bin/xray mldsa65 2>/dev/null | awk '/Seed/{print $2}')
+        MLKEM768_SEED=$(/usr/local/bin/xray mlkem768 2>/dev/null | awk '/Seed/{print $2}')
+        DEST="www.microsoft.com:443"
+        cat > /etc/xray/config.json << EOFJSON
+{"inbounds":[{"listen":"0.0.0.0","port":443,"protocol":"vless","settings":{"clients":[{"id":"$VLESS_UUID","flow":"xtls-rprx-vision","email":"user@example.com"}],"decryption":"none"},"streamSettings":{"network":"tcp","security":"reality","realitySettings":{"show":"","dest":"$DEST","xver":0,"serverNames":["$DEST"],"privateKey":"$X25519","shortIds":["$SHORT_ID"]}},"sniffing":{"enabled":true,"destOverride":["http","tls","quic"],"routeOnly":true}}],"outbounds":[{"protocol":"freedom","tag":"direct"}]}
+EOFJSON
+        cat > /etc/xray/creds.json << EOFJSON
+{"vps_ip":"${VPS_IP:-10.10.10.1}","uuid":"$VLESS_UUID","pubkey":"$X25519","short_id":"$SHORT_ID","dest":"$DEST","mldsa65_seed":"$MLDSA65_SEED","mlkem768_seed":"$MLKEM768_SEED"}
+EOFJSON
+    }
+}
+XRAYINIT
+chmod +x "$VPS_OVERLAY/etc/init.d/xray"
+
 assert_file "$VPS_OVERLAY/etc/hostname" "vps /etc/hostname exists"
 assert_contains "$VPS_OVERLAY/etc/hostname" "myi2pd-gateway" "vps hostname is myi2pd-gateway"
 assert_file "$VPS_OVERLAY/etc/network/interfaces" "vps /etc/network/interfaces exists"
 assert_contains "$VPS_OVERLAY/etc/network/interfaces" "eth0.*inet dhcp" "vps eth0 uses DHCP"
 assert_file "$VPS_OVERLAY/etc/i2pd/i2pd.conf" "vps i2pd.conf exists"
 assert_file "$VPS_OVERLAY/etc/nftables/nftables.nft" "vps nftables.nft exists"
+[ -d "$VPS_OVERLAY/etc/xray" ] && pass "vps /etc/xray directory exists" || fail "vps /etc/xray directory exists"
 
 # --- VPS runlevels ---
 assert_symlink "$VPS_OVERLAY/etc/runlevels/boot/eth1-lan" "/etc/init.d/eth1-lan" \
     "vps eth1-lan in boot runlevel"
 assert_symlink "$VPS_OVERLAY/etc/runlevels/default/i2pd" "/etc/init.d/i2pd" \
     "vps i2pd in default runlevel"
-assert_symlink "$VPS_OVERLAY/etc/runlevels/default/trusttunnel" "/etc/init.d/trusttunnel" \
-    "vps trusttunnel in default runlevel"
+assert_symlink "$VPS_OVERLAY/etc/runlevels/default/xray" "/etc/init.d/xray" \
+    "vps xray in default runlevel"
 assert_symlink "$VPS_OVERLAY/etc/runlevels/default/nftables" "/etc/init.d/nftables" \
     "vps nftables in default runlevel"
 assert_symlink "$VPS_OVERLAY/etc/runlevels/default/dnsmasq" "/etc/init.d/dnsmasq" \
     "vps dnsmasq in default runlevel"
 
-summary
-exit $?
-
-# --- VPS binaries present ---
-assert_file "$REPO_ROOT/vps/bin/trusttunnel_endpoint" "vps trusttunnel_endpoint exists"
-assert_executable "$REPO_ROOT/vps/bin/trusttunnel_endpoint" "vps trusttunnel_endpoint executable"
+# --- VPS binaries (xray downloaded/built at runtime by setup script) ---
 assert_file "$REPO_ROOT/vps/bin/setup_wizard" "vps setup_wizard exists"
 assert_executable "$REPO_ROOT/vps/bin/setup_wizard" "vps setup_wizard executable"
 
+# --- xray init script generates config at runtime ---
+assert_file "$VPS_OVERLAY/etc/init.d/xray" "vps xray init script exists"
+assert_contains "$VPS_OVERLAY/etc/init.d/xray" "xtls-rprx-vision" "xray init enforces vision flow"
+assert_contains "$VPS_OVERLAY/etc/init.d/xray" "realitySettings" "xray init has reality config"
+assert_contains "$VPS_OVERLAY/etc/init.d/xray" "microsoft.com" "xray init uses microsoft dest"
+assert_contains "$VPS_OVERLAY/etc/init.d/xray" "shortIds" "xray init has shortIds"
+assert_contains "$VPS_OVERLAY/etc/init.d/xray" "mldsa65" "xray init has post-quantum ML-DSA-65"
+assert_contains "$VPS_OVERLAY/etc/init.d/xray" "mlkem768" "xray init has post-quantum ML-KEM-768"
+
+# --- Tier 2 Cloudflare fallback config template ---
+assert_file "$REPO_ROOT/vps/configs/xray-tier2/config_server.json" "vps tier2 config template exists"
+assert_contains "$REPO_ROOT/vps/configs/xray-tier2/config_server.json" "ws" "tier2 uses websocket"
+assert_contains "$REPO_ROOT/vps/configs/xray-tier2/config_server.json" "tls" "tier2 uses tls"
+
+summary
+exit $?

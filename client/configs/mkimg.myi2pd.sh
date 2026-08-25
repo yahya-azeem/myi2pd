@@ -1,7 +1,7 @@
 profile_myi2pd() {
     profile_standard
     name="myi2pd"
-    desc="Amnesiac TrustTunnel Network Gateway Client"
+    desc="Amnesiac VLESS XTLS-Reality Network Gateway Client"
     arch="x86_64"
     kernel_flavors="virt"
     kernel_addons=""

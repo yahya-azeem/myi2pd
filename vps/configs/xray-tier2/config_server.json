@@ -1,0 +1,48 @@
+{
+  "inbounds": [
+    {
+      "listen": "0.0.0.0",
+      "port": 443,
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "TIER2_UUID_PLACEHOLDER",
+            "flow": "",
+            "email": "tier2-user@example.com"
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "tls",
+        "wsSettings": {
+          "path": "/tier2",
+          "headers": {
+            "Host": "TIER2_CF_DOMAIN_PLACEHOLDER"
+          }
+        },
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/etc/xray/tier2_cert.pem",
+              "keyFile": "/etc/xray/tier2_key.pem"
+            }
+          ],
+          "alpn": ["h2", "http/1.1"]
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "tag": "direct"
+    }
+  ]
+}

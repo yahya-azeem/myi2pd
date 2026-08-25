@@ -42,12 +42,11 @@ jobs:
             client/overlay-tmp/etc/xdg/waybar \
             client/overlay-tmp/etc/xdg/foot \
             client/overlay-tmp/etc/wallpaper \
-            client/overlay-tmp/etc/trusttunnel \
+            client/overlay-tmp/etc/xray \
             client/overlay-tmp/etc/ncneofetch \
             client/overlay-tmp/etc/network \
             client/overlay-tmp/usr/local/bin \
             client/overlay-tmp/usr/local/share/myi2pd \
-            client/overlay-tmp/usr/lib/librewolf/distribution/extensions \
             client/overlay-tmp/usr/share/fonts/SauceCodePro \
             client/overlay-tmp/root/.config/river \
             client/overlay-tmp/root/.config/foot \
@@ -75,7 +74,7 @@ jobs:
           cp client/configs/autologin client/overlay-tmp/usr/local/bin/autologin
           cp client/configs/librewolf-launcher client/overlay-tmp/usr/local/bin/librewolf-launcher
           cp client/configs/os-release client/overlay-tmp/etc/os-release
-          cp client/configs/vps_ip.txt client/overlay-tmp/etc/trusttunnel/vps_ip.txt
+          cp client/configs/vps_ip.txt client/overlay-tmp/etc/xray/vps_ip.txt
           cp client/configs/pentest-apks.list client/overlay-tmp/etc/pentest-apks.list
           cp client/configs/pentest-lazy.list client/overlay-tmp/etc/pentest-lazy.list
           cp client/configs/pentest-extra.sh client/overlay-tmp/usr/local/bin/pentest-extra.sh
@@ -184,6 +183,7 @@ jobs:
             vps/overlay-tmp/etc/i2pd \
             vps/overlay-tmp/etc/network \
             vps/overlay-tmp/etc/sysctl.d \
+            vps/overlay-tmp/etc/xray \
             vps/overlay-tmp/usr/local/bin \
             vps/overlay-tmp/root \
             vps/overlay-tmp/var/lib/i2pd/netDb
@@ -195,7 +195,13 @@ jobs:
           cp vps/configs/i2pd.conf vps/overlay-tmp/etc/i2pd/i2pd.conf
           cp vps/configs/nftables.nft vps/overlay-tmp/etc/nftables.nft
           cp -r vps/netDb/* vps/overlay-tmp/var/lib/i2pd/netDb/
-          cp vps/bin/trusttunnel_endpoint vps/overlay-tmp/usr/local/bin/
+          if [ -x /tmp/xray/xray ]; then
+              cp /tmp/xray/xray vps/overlay-tmp/usr/local/bin/
+          elif [ -x /usr/local/bin/xray ]; then
+              cp /usr/local/bin/xray vps/overlay-tmp/usr/local/bin/
+          else
+              echo "WARNING: Xray binary not found"
+          fi
           cp vps/bin/setup_wizard vps/overlay-tmp/usr/local/bin/
 
       - name: Build VPS ISO

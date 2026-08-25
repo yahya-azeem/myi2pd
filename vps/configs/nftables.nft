@@ -8,23 +8,15 @@ table inet filter {
         # Allow established/related connections
         ct state established,related accept
 
-        # TrustTunnel Endpoint (Disguised as standard HTTPS)
+        # VLESS + XTLS-Reality endpoint (disguised as standard HTTPS on port 443)
         tcp dport 443 accept
         udp dport 443 accept
-
-        # Dedicated static I2P network routing port
-        tcp dport 25432 accept
-        udp dport 25432 accept
-
-        # i2pd proxy ports accessible from TrustTunnel VPN clients
-        iifname "tun+" tcp dport 4444 accept
-        iifname "tun+" tcp dport 4447 accept
     }
 
     chain forward {
         type filter hook forward priority 0; policy drop;
 
-        # Forward traffic originating from the TrustTunnel VPN interface (e.g. tun0)
+        # Forward traffic originating from the VLESS tunnel interface
         iifname "tun+" accept
 
         # Forward return traffic for established connections
@@ -32,7 +24,25 @@ table inet filter {
     }
 
     chain output {
-        type filter hook output priority 0; policy accept;
+        type filter hook output priority 0; policy drop;
+
+        # Rule 1: Allow loopback for internal IPC/proxies
+        oif "lo" accept
+
+        # Rule 2: Allow local DNS queries
+        udp dport 53 accept
+
+        # Rule 3: Allow connection to the VPS IP on port 443 (VLESS + XTLS-Reality)
+        ip daddr @vps_ip tcp dport 443 accept
+        ip daddr @vps_ip udp dport 443 accept
+
+        # Rule 4: Allow SOCKS (4447) and DNS (53) to VPS directly (for proxy even before tun0)
+        ip daddr @vps_ip tcp dport 4447 accept
+        ip daddr @vps_ip tcp dport 53 accept
+        ip daddr @vps_ip udp dport 53 accept
+
+        # Rule 5: Allow all traffic over the established VPN tunnel interface
+        oif "tun0" accept
     }
 }
 

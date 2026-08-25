@@ -144,7 +144,7 @@ assemble_client_overlay() {
              "$dest/etc/xdg/waybar" \
              "$dest/etc/xdg/foot" \
              "$dest/etc/wallpaper" \
-             "$dest/etc/trusttunnel" \
+             "$dest/etc/xray" \
              "$dest/etc/ncneofetch" \
              "$dest/etc/network" \
              "$dest/usr/local/bin" \
@@ -175,7 +175,7 @@ assemble_client_overlay() {
     cp "$REPO_ROOT/client/configs/autologin" "$dest/usr/local/bin/autologin"
     cp "$REPO_ROOT/client/configs/librewolf-launcher" "$dest/usr/local/bin/librewolf-launcher"
     cp "$REPO_ROOT/client/configs/os-release" "$dest/etc/os-release"
-    cp "$REPO_ROOT/client/configs/vps_ip.txt" "$dest/etc/trusttunnel/vps_ip.txt"
+    cp "$REPO_ROOT/client/configs/vps_ip.txt" "$dest/etc/xray/vps_ip.txt"
     cp "$REPO_ROOT/client/configs/pentest-apks.list" "$dest/etc/pentest-apks.list"
     cp "$REPO_ROOT/client/configs/pentest-lazy.list" "$dest/etc/pentest-lazy.list"
     cp "$REPO_ROOT/client/configs/pentest-extra.sh" "$dest/usr/local/bin/pentest-extra.sh"
@@ -300,7 +300,7 @@ assemble_vps_overlay() {
     ln -sf /etc/init.d/networking "$dest/etc/runlevels/default/networking"
     ln -sf /etc/init.d/nftables "$dest/etc/runlevels/default/nftables"
     ln -sf /etc/init.d/i2pd "$dest/etc/runlevels/default/i2pd"
-    ln -sf /etc/init.d/trusttunnel "$dest/etc/runlevels/default/trusttunnel"
+    ln -sf /etc/init.d/xray "$dest/etc/runlevels/default/xray"
     ln -sf /etc/init.d/dnsmasq "$dest/etc/runlevels/default/dnsmasq"
 }
 

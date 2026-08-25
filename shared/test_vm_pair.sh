@@ -26,7 +26,10 @@ echo "=== myi2pd QEMU VM Test ==="
 [ "$RUN_CLIENT" = false ] || [ -f "$ISO_PATH" ] || { echo "ERROR: Client ISO not found"; exit 1; }
 
 if [ "$RUN_SERVER" = true ]; then
-    [ -f "$PROJECT_ROOT/vps/bin/trusttunnel_endpoint" ] || { echo "ERROR: TrustTunnel binaries not found"; exit 1; }
+    # Check for xray binary or download capability
+    if [ ! -f "$PROJECT_ROOT/vps/bin/xray" ] && [ ! -f "/tmp/xray/xray" ]; then
+        echo "WARNING: Xray binary not found in vps/bin/, will be downloaded at runtime"
+    fi
 
     if [ ! -f "$BASE_QCOW2" ]; then
         echo "Downloading Alpine Cloud Base image..."
@@ -38,7 +41,13 @@ if [ "$RUN_SERVER" = true ]; then
     qemu-img resize "$VPS_QCOW2" 2G &>/dev/null
     rm -rf "$CIDATA_DIR"
     mkdir -p "$CIDATA_DIR/bin" "$CIDATA_DIR/vps"
-    cp "$PROJECT_ROOT/vps/bin/trusttunnel_endpoint" "$CIDATA_DIR/bin/"
+    
+    # Copy xray binary if available, or it will be downloaded by setup_vps.sh
+    if [ -f "$PROJECT_ROOT/vps/bin/xray" ]; then
+        cp "$PROJECT_ROOT/vps/bin/xray" "$CIDATA_DIR/bin/"
+    elif [ -f "/tmp/xray/xray" ]; then
+        cp "/tmp/xray/xray" "$CIDATA_DIR/bin/"
+    fi
     cp "$PROJECT_ROOT/vps/bin/setup_wizard" "$CIDATA_DIR/bin/"
     cp -r "$PROJECT_ROOT/vps/configs" "$CIDATA_DIR/vps/"
     cp -r "$PROJECT_ROOT/vps/scripts" "$CIDATA_DIR/vps/"
@@ -59,7 +68,9 @@ mkdir -p /mnt/cidata
 mount /dev/sr0 /mnt/cidata || mount /dev/cdrom /mnt/cidata
 mkdir -p /etc/myi2pd-configs
 cp -r /mnt/cidata/vps/configs/* /etc/myi2pd-configs/
-cp /mnt/cidata/bin/trusttunnel_endpoint /usr/local/bin/
+if [ -f /mnt/cidata/bin/xray ]; then
+    cp /mnt/cidata/bin/xray /usr/local/bin/
+fi
 cp /mnt/cidata/bin/setup_wizard /usr/local/bin/
 chmod +x /usr/local/bin/*
 echo "Setting up private LAN on eth1..."
@@ -76,7 +87,7 @@ chmod +x /tmp/setup_vps.sh
 sh /tmp/setup_vps.sh
 echo "Starting services..."
 rc-service i2pd start || true
-/etc/init.d/trusttunnel start || trusttunnel_endpoint /etc/trusttunnel/vpn.toml /etc/trusttunnel/hosts.toml &
+rc-service xray start || /tmp/xray/xray -conf /etc/xray/config.json &
 echo "=== VPS Gateway Setup Complete ==="
 SHEOF
 fi

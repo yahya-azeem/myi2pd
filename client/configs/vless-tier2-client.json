@@ -1,0 +1,36 @@
+{
+  "log": {"loglevel": "warning"},
+  "inbounds": [{
+    "listen": "127.0.0.1",
+    "port": 10809,
+    "protocol": "socks",
+    "settings": {"udp": true},
+    "sniffing": {"enabled": true, "destOverride": ["http", "tls"], "routeOnly": true}
+  }],
+  "outbounds": [{
+    "protocol": "vless",
+    "settings": {
+      "address": "TIER2_CF_DOMAIN_PLACEHOLDER",
+      "port": 443,
+      "id": "TIER2_UUID_PLACEHOLDER",
+      "encryption": "none"
+    },
+    "streamSettings": {
+      "network": "ws",
+      "security": "tls",
+      "wsSettings": {
+        "path": "/tier2",
+        "headers": {
+          "Host": "TIER2_CF_DOMAIN_PLACEHOLDER"
+        }
+      },
+      "tlsSettings": {
+        "allowInsecure": false,
+        "serverName": "TIER2_CF_DOMAIN_PLACEHOLDER",
+        "alpn": ["h2", "http/1.1"]
+      }
+    },
+    "mux": {"enabled": true, "concurrency": 8},
+    "tag": "tier2-proxy"
+  }]
+}

@@ -27,7 +27,7 @@ truth for your operating environment and capabilities.
 ## 2. NETWORKING: DOUBLE TUNNEL + KILL-SWITCH
 
 - Two tunnels carry all egress:
-  - **Outer**: TrustTunnel (TLS on port 443) from client → VPS.
+  - **Outer**: VLESS + XTLS-Reality (TCP 443) from client → VPS — Reality "steal" impersonates microsoft.com TLS handshake, no domain registration, active probes forwarded to real microsoft.com.
   - **Inner**: I2P garlic routing via SOCKS5 through i2pd on the VPS.
 - `nftables` is set to **default-drop**. Outbound is *only* permitted toward the
   VPS IP on port 443; everything else routes via `tun0` into the tunnel.
@@ -78,8 +78,8 @@ ON DEMAND and lives in RAM only until reboot:
 - **Networking / tunnels**
   - `wifi-connect.sh` - Wi-Fi setup (takes creds in RAM, pins firewall to VPS)
   - `i2p-keepalive.sh` - keeps the i2p tunnel alive
-  - `trusttunnel_client` - outer TLS tunnel binary
-  - `nftables` - firewall config (default-drop)
+  - `xray` - VLESS + XTLS-Reality tunnel binary (client)
+  - `nftables` - firewall config (default-drop kill switch)
 - **Pentest / security** (Alpine `.apk` on the ISO; load via
   `/usr/local/bin/pentest-extra.sh`): `ffuf`, `sqlmap`, `hashcat`, `gitleaks`,
   `nuclei`, `httpx`, `naabu`, `katana`, `rustscan`, `mitmproxy`, `rizin`,
@@ -93,7 +93,7 @@ ON DEMAND and lives in RAM only until reboot:
     compatible at `http://127.0.0.1:11434/v1`, loaded from an on-disk squashfs.
 - **Desktop / system**: `fuzzel`, `foot`, `waybar`, `river`, `swaybg`,
   `ncneofetch`, `agetty`, `bash`, `openssl`, `udev`, `util-linux`
-- VPS-side (not on the client): `i2pd`, `trusttunnel` endpoint, `dnsmasq`.
+- VPS-side (not on the client): `i2pd`, `xray` (VLESS+Reality server), `dnsmasq`.
 
 Check what is present with `command -v <tool>` or `ls /usr/local/bin` before
 assuming a tool is installed - many are on-demand only.
@@ -111,7 +111,7 @@ assuming a tool is installed - many are on-demand only.
 - Loading tools is a **one-way door for RAM**: installed copies live in tmpfs
   and are gone on reboot. Do not run these scripts speculatively.
 
-## 7. YOUR CONSTRAINTFS / RESTRAINTS (HARD RULES)
+## 7. YOUR CONSTRAINTS / RESTRAINTS (HARD RULES)
 
 1. **Never write to block devices or the host disk** (`/dev/nvme0n1p8`, raw
    block ops). The boot layer read-locks them on purpose.

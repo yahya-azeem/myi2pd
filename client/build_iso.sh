@@ -17,13 +17,11 @@ if ! command -v docker &>/dev/null; then
 fi
 
 echo "Cleaning up previous builds..."
-rm -rf "$OVERLAY_TMP" "$OUT_DIR" 2>/dev/null || true
-mkdir -p "$OVERLAY_TMP" "$OUT_DIR"
+rm -rf "$OVERLAY_TMP" "$OUT_DIR" 2>/dev/null || mkdir -p "$OVERLAY_TMP" "$OUT_DIR"
 
 echo "Structuring overlay directories..."
 mkdir -p "$OVERLAY_TMP/etc/init.d" \
          "$OVERLAY_TMP/etc/network" \
-         "$OVERLAY_TMP/etc/trusttunnel" \
          "$OVERLAY_TMP/etc/nftables" \
          "$OVERLAY_TMP/etc/librewolf" \
          "$OVERLAY_TMP/etc/river" \
@@ -39,7 +37,6 @@ mkdir -p "$OVERLAY_TMP/etc/init.d" \
          "$OVERLAY_TMP/root/.config/river" \
          "$OVERLAY_TMP/root/.config/foot" \
          "$OVERLAY_TMP/usr/local/share/myi2pd"
-
 
 # Copy configurations into overlay locations
 echo "Copying config templates to overlay..."
@@ -128,7 +125,7 @@ fi
 # Copy pre-configured VPS IP if it exists
 if [ -f "$WORKSPACE_DIR/configs/vps_ip.txt" ]; then
     echo "Pre-configuring ISO with VPS IP: $(cat $WORKSPACE_DIR/configs/vps_ip.txt)"
-    cp "$WORKSPACE_DIR/configs/vps_ip.txt" "$OVERLAY_TMP/etc/trusttunnel/vps_ip.txt"
+    cp "$WORKSPACE_DIR/configs/vps_ip.txt" "$OVERLAY_TMP/etc/xray/vps_ip.txt"
 fi
 
 # FOSS pentest tooling: Alpine apk list (baked) + on-demand heavy installer.
@@ -200,8 +197,11 @@ iface eth0 inet dhcp
     udhcpc_opts -b
 EOF
 
+# VLESS/Xray overlay config directory (for xray binary and config)
+mkdir -p "$OVERLAY_TMP/etc/xray"
+
 if ! docker image inspect myi2pd-builder >/dev/null 2>&1; then
-    echo "Building Docker environment (this compiles TrustTunnel statically)..."
+    echo "Building Docker environment (this compiles Xray statically)..."
     docker build -t myi2pd-builder "$WORKSPACE_DIR"
 else
     echo "Using pre-built/cached myi2pd-builder Docker image..."
