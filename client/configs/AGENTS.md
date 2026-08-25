@@ -88,7 +88,8 @@ ON DEMAND and lives in RAM only until reboot:
   `kerbrute`, `ligolo-agent`/`ligolo-proxy`, `sliver`, `netexec`, `certipy`,
   `coercer`, `evil-winrm`, `pypykatz`
 - **AI agent / local inference** (load via `/usr/local/bin/ai-extra.sh`):
-  - `claurst` - the coding agent (you). Native single binary, no telemetry.
+  - `dsh` (DeepSeek Harness) - agent harness with Web UI at `http://127.0.0.1:3080`.
+    Runs via npx @deepseek-ai/dsh, plugin-based architecture.
   - Ollama container - local LLM inference (CPU + NVIDIA + AMD), OpenAI
     compatible at `http://127.0.0.1:11434/v1`, loaded from an on-disk squashfs.
 - **Desktop / system**: `fuzzel`, `foot`, `waybar`, `river`, `swaybg`,
@@ -103,10 +104,10 @@ assuming a tool is installed - many are on-demand only.
 - **Pentest tools**: `sudo /usr/local/bin/pentest-extra.sh`
   - Installs the heavy Alpine pentest pack from the ISO repo (offline) + the
     Go/pip/gem tools (needs tunnel for egress). Requires `curl` + `zstd`.
-- **AI / Ollama / Claurst**: `sudo /usr/local/bin/ai-extra.sh`
+- **AI / Ollama / DeepSeek Harness**: `sudo /usr/local/bin/ai-extra.sh`
   - Starts dockerd (on-demand), mounts the Ollama squashfs, docker-loads the
-    image, runs it with GPU detection, installs `claurst`. Subcommands:
-    `start|stop|status`.
+    image, runs it with GPU detection, runs DeepSeek Harness (dsh) via npx.
+    Subcommands: `start|stop|status`.
   - Say `sudo /usr/local/bin/ai-extra.sh start` if local inference is needed.
 - Loading tools is a **one-way door for RAM**: installed copies live in tmpfs
   and are gone on reboot. Do not run these scripts speculatively.

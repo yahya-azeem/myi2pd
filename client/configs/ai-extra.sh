@@ -2,25 +2,21 @@
 # client/configs/ai-extra.sh - On-demand AI stack for the amnesiac client.
 #
 # The amnesiac ISO boots diskless into 4G of tmpfs root. Tensor/GPU workloads
-# (Ollama) and coding agents (Claurst) must therefore NOT be baked into the
-# root at boot - that would blow the RAM budget and they need a glibc container
-# we ship on disk. This script, run ONCE when the user wants local inference,
+# (Ollama) and agent harness (DeepSeek Harness) must therefore NOT be baked into
+# the root at boot. This script, run ONCE when the user wants local inference,
 # assembles the stack. Everything non-persistent: reboot or unplug the stick
 # returns the system to a clean amnesiac state.
 #
 #   sudo /usr/local/bin/ai-extra.sh [start|stop|status]
 #
 # What it does:
-#   1. apk-add the lazy docker stack from the live ISO repo (offline, no net).
-#   2. Locate + loop-mount the on-disk Ollama squashfs (myi2pd-ollama.squashfs,
-#      shipped next to the ISO / on the same USB media).
+#   1. apk-add the lazy docker + nodejs stack from the live ISO repo (offline).
+#   2. Locate + loop-mount the on-disk Ollama squashfs (myi2pd-ollama.squashfs).
 #   3. Start dockerd, docker-load the Ollama image, run it with GPU detection
-#      (NVIDIA via nvidia-container-toolkit --gpus all, AMD via /dev/kfd+/dev/dri,
-#      else CPU).
-#   4. Install the Claurst coding agent binary (native, NOT containerized).
-#   5. Lay down the ingrained agent context (~/.claude/CLAUDE.md) + a
-#      Claurst settings.json that points at the local Ollama server, so the
-#      agent knows the amnesiac environment, every tool, and its restraints.
+#      (NVIDIA via --gpus all, AMD via /dev/kfd+/dev/dri, else CPU).
+#   4. Install/Run DeepSeek Harness (dsh) via npx (downloads @deepseek-ai/dsh from npm).
+#   5. Lay down the ingrained agent context (~/.deepseek-harness/CLAUDE.md) + config
+#      that points at the local Ollama server.
 
 set -euo pipefail
 
@@ -29,8 +25,8 @@ TAG="myi2pd-ollama:latest"
 IMG_TAR="ollama-image.tar"
 SQUASHFS="myi2pd-ollama.squashfs"
 OLLAMA_URL="http://127.0.0.1:11434"
-API_BASE="/v1"               # OpenAI-compatible endpoint Claurst uses
-CLAURST_VER_LINUX="claurst-linux-x86_64.tar.gz"
+API_BASE="/v1"
+DSH_PORT=3080
 
 # --------------------------------------------------------------------------
 # helpers
@@ -39,8 +35,6 @@ log() { echo "[ai] $*"; }
 need() { command -v "$1" >/dev/null 2>&1; }
 
 start_squashfs() {
-    # The squashfs is shipped beside the ISO / on the boot media. Find any
-    # block device containing it. Covers USB stick (vfat/ext), loop files.
     local mnt="${MNT:-/mnt/ollama}"
     mkdir -p "$mnt"
     local dev
@@ -52,7 +46,6 @@ start_squashfs() {
         elif mountpoint -q "$mnt"; then
             continue
         elif [ -f "$dev" ]; then
-            # loop / file-backed squashfs path passed via SQUASHFS_DEV=file
             mount -o loop,ro "$dev" "$mnt" 2>/dev/null \
                 && [ -f "$mnt/$IMG_TAR" ] && { OLLAMA_MNT="$mnt"; return 0; }
         else
@@ -61,7 +54,6 @@ start_squashfs() {
             mountpoint -q "$mnt" && umount "$mnt" 2>/dev/null || true
         fi
     done
-    # Fall back to the repo-root copy (useful for local/VM testing).
     for cand in "$SQUASHFS" "/media/$SQUASHFS" "/root/$SQUASHFS"; do
         if [ -f "$cand" ]; then
             mount -o loop,ro "$cand" "$mnt" 2>/dev/null \
@@ -75,7 +67,6 @@ start_squashfs() {
 }
 
 detect_gpu() {
-    # Returns the docker device/GPU flags. NVIDIA preferred, then AMD, else CPU.
     if ls /dev/nvidiactl >/dev/null 2>&1; then
         echo "--gpus all"
     elif [ -e /dev/kfd ] && [ -e /dev/dri/renderD128 ]; then
@@ -85,13 +76,11 @@ detect_gpu() {
     fi
 }
 
-ensure_docker() {
-    # Load the docker stack from the ISO on-disk apk repo (offline). These are
-    # NOT in world, so they install to RAM only when this script runs.
-    if need docker && need dockerd; then
-        log "docker already present"
+ensure_docker_and_node() {
+    if need docker && need dockerd && need node && need npx; then
+        log "docker + node already present"
     else
-        log "loading docker stack from ISO repo (offline)"
+        log "loading docker + nodejs stack from ISO repo (offline)"
         apk add --quiet $(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' /etc/ai-apks.list)
     fi
     if ! rc-service docker status >/dev/null 2>&1; then
@@ -101,63 +90,63 @@ ensure_docker() {
     for i in $(seq 1 20); do
         docker info >/dev/null 2>&1 && break || sleep 1
     done
+    log "Node: $(node --version), npm: $(npm --version), npx: $(npx --version)"
 }
 
 stop() {
-    log "stopping ollama container + unmounting squashfs"
+    log "stopping ollama container + dsh + unmounting squashfs"
     docker rm -f myi2pd-ollama >/dev/null 2>&1 || true
+    pkill -f "@deepseek-ai/dsh" 2>/dev/null || true
     if [ -n "${OLLAMA_MNT:-}" ] && mountpoint -q "$OLLAMA_MNT"; then
         umount "$OLLAMA_MNT" 2>/dev/null || true
     fi
-    log "done (RAM freed; agent binary + context remain)"
+    log "done (RAM freed; agent context remains)"
 }
 
-install_claurst() {
-    if need claurst; then
-        log "claurst already installed"
-        return 0
-    fi
-    # Native binary download (single file, no telemetry). Use the on-media copy
-    # if present, else fetch from GitHub releases.
-    local tmp
-    tmp="$(mktemp -d)"
-    trap 'rm -rf "$tmp"' RETURN
-    if [ -f "${OLLAMA_MNT:-/nonexistent}/$CLAURST_VER_LINUX" ]; then
-        cp "${OLLAMA_MNT}/$CLAURST_VER_LINUX" "$tmp/"
+run_dsh() {
+    log "starting DeepSeek Harness (dsh) web UI on port $DSH_PORT"
+    # Allow firewall access to DSH web UI
+    nft add rule inet filter output tcp dport $DSH_PORT accept 2>/dev/null || true
+    
+    # Run DSH via npx - it will download @deepseek-ai/dsh from npm on first run
+    # DSH reads OLLAMA_BASE_URL env for the local model server
+    OLLAMA_BASE_URL="$OLLAMA_URL" \
+    DSH_HOST=127.0.0.1 \
+    DSH_PORT=$DSH_PORT \
+    npx --yes @deepseek-ai/dsh@latest web --host 127.0.0.1 --port $DSH_PORT --no-open \
+        > /tmp/dsh.log 2>&1 &
+    local dsh_pid=$!
+    echo $dsh_pid > /tmp/dsh.pid
+    sleep 3
+    if kill -0 $dsh_pid 2>/dev/null; then
+        log "DeepSeek Harness running: http://127.0.0.1:$DSH_PORT"
     else
-        local ver
-        ver="$(curl -fsSL https://api.github.com/repos/Kuberwastaken/claurst/releases/latest \
-                 | grep -oE '"tag_name": *"[^"]+"' | head -1 | sed -E 's/.*"v?([^"]+)"/\1/')"
-        log "downloading claurst v$ver"
-        curl -fsSL "https://github.com/Kuberwastaken/claurst/releases/download/v${ver}/${CLAURST_VER_LINUX}" \
-            -o "$tmp/$CLAURST_VER_LINUX"
+        log "ERROR: DSH failed to start, check /tmp/dsh.log"
+        tail -20 /tmp/dsh.log
+        return 1
     fi
-    tar -xzf "$tmp/$CLAURST_VER_LINUX" -C "$tmp"
-    install -m 0755 "$tmp/claurst" /usr/local/bin/claurst
-    log "claurst installed: $(command -v claurst)"
 }
 
 install_agent_context() {
-    # "Ingrained" context: Claurst auto-loads CLAUDE.md walked up from cwd and
-    # ~/.claude/CLAUDE.md. We layer it so no matter where the agent opens, it
-    # knows this is an amnesiac box (see client/configs/CLAUDE.md) and is pinned
-    # to its tool catalog + restraints.
-    mkdir -p /root/.claude /root/.claurst
+    mkdir -p /root/.deepseek-harness /root/.claude
+    # Layer CLAUDE.md for any agent (Claurst, DSH, etc.)
     install -m 0644 /usr/local/share/myi2pd/CLAUDE.md /root/.claude/CLAUDE.md 2>/dev/null \
         || install -m 0644 /usr/local/share/myi2pd/AGENTS.md /root/.claude/CLAUDE.md
-    # Point Claurst at the local Ollama server (OpenAI-compatible /v1) by default.
-    cat > /root/.claurst/settings.json <<'JSON'
+    # DeepSeek Harness config: point to local Ollama
+    cat > /root/.deepseek-harness/config.json <<'JSON'
 {
-  "provider": "ollama",
-  "config": {
-    "model": "qwen2.5-coder:1.5b",
-    "permission_mode": "default",
-    "auto_compact": true,
-    "compact_threshold": 0.8
+  "model": {
+    "provider": "ollama",
+    "baseUrl": "http://127.0.0.1:11434/v1",
+    "model": "qwen2.5-coder:1.5b"
+  },
+  "harness": {
+    "host": "127.0.0.1",
+    "port": 3080
   }
 }
 JSON
-    log "agent context installed: /root/.claude/CLAUDE.md + /root/.claurst/settings.json"
+    log "agent context installed: /root/.claude/CLAUDE.md + /root/.deepseek-harness/config.json"
 }
 
 # --------------------------------------------------------------------------
@@ -168,12 +157,16 @@ case "$ACTION" in
     status)
         docker ps -a --format '{{.Names}} {{.Status}}' 2>/dev/null | grep myi2pd-ollama \
             || echo "ollama not running"
-        command -v claurst || echo "claurst not installed"
+        if [ -f /tmp/dsh.pid ] && kill -0 "$(cat /tmp/dsh.pid)" 2>/dev/null; then
+            echo "deepseek-harness running (pid $(cat /tmp/dsh.pid)) on port $DSH_PORT"
+        else
+            echo "deepseek-harness not running"
+        fi
         exit 0
         ;;
 esac
 
-ensure_docker
+ensure_docker_and_node
 start_squashfs
 [ -n "${OLLAMA_MNT:-}" ] || exit 1
 
@@ -188,10 +181,12 @@ docker run -d --name myi2pd-ollama --restart unless-stopped \
     -e OLLAMA_HOST=0.0.0.0:11434 \
     "$TAG"
 
-install_claurst
+run_dsh
 install_agent_context
 
-log "done. Ollama: $OLLAMA_URL  |  Claurst: claurst"
+log "done."
+echo "  Ollama API:   $OLLAMA_URL$API_BASE"
+echo "  DeepSeek DSH: http://127.0.0.1:$DSH_PORT (Web UI)"
 echo
 echo "Quick check: curl $OLLAMA_URL/v1/models"
-echo "Start Claurst with Ollama:  claurst --provider ollama --model qwen2.5-coder:1.5b"
+echo "DSH Web UI opens at: http://127.0.0.1:$DSH_PORT"

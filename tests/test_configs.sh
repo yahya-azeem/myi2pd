@@ -158,13 +158,16 @@ fi
 assert_contains "$REPO_ROOT/client/configs/pentest-extra.sh" 'pypykatz' \
     "pentest-extra.sh pip-installs pypykatz"
 
-group "Config syntax: on-demand AI stack (Docker/Ollama/Claurst)"
+group "Config syntax: on-demand AI stack (Docker/Ollama/DeepSeek Harness)"
 AI_EXTRA="$REPO_ROOT/client/configs/ai-extra.sh"
 assert_file "$AI_EXTRA" "ai-extra.sh exists"
-# The AI runtime stack (docker toolbox) ships as a lazy apk list so it installs
-# ONLY on demand, never into the 4G tmpfs root at boot.
+# The AI runtime stack (docker toolbox + nodejs) ships as a lazy apk list so it
+# installs ONLY on demand, never into the 4G tmpfs root at boot.
 assert_file "$REPO_ROOT/client/configs/ai-apks.list" "ai-apks.list exists"
 assert_contains "$REPO_ROOT/client/configs/ai-apks.list" 'docker' "ai list loads docker"
+assert_contains "$REPO_ROOT/client/configs/ai-apks.list" 'nodejs' "ai list loads nodejs"
+assert_contains "$REPO_ROOT/client/configs/ai-apks.list" 'npm' "ai list loads npm"
+assert_contains "$REPO_ROOT/client/configs/ai-apks.list" 'pnpm' "ai list loads pnpm"
 # The docker toolbox package names MUST be valid Alpine edge packages: it is
 # docker-cli-buildx / docker-cli-compose, NOT docker-buildx / docker-compose
 # (a wrong name makes `apk add` fail and the whole ISO build exit 1 - seen in CI).
@@ -191,7 +194,7 @@ assert_contains "$AI_EXTRA" '"myi2pd-ollama.squashfs"' "ai-extra.sh references t
 assert_contains "$AI_EXTRA" 'docker load' "ai-extra.sh docker-loads the Ollama image"
 assert_contains "$AI_EXTRA" '--gpus all' "ai-extra.sh supports NVIDIA CUDA"
 assert_contains "$AI_EXTRA" '/dev/kfd' "ai-extra.sh supports AMD ROCm (kfd/dri)"
-assert_contains "$AI_EXTRA" 'install_claurst' "ai-extra.sh installs the Claurst agent"
+assert_contains "$AI_EXTRA" 'run_dsh' "ai-extra.sh runs DeepSeek Harness"
 assert_contains "$AI_EXTRA" 'CLAUDE.md' "ai-extra.sh installs the ingrained agent context"
 # The agent context (CLAUDE.md/AGENTS.md) must prescribe the amnesiac restraints.
 AGENTS="$REPO_ROOT/client/configs/AGENTS.md"
