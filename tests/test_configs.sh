@@ -161,13 +161,11 @@ assert_contains "$REPO_ROOT/client/configs/pentest-extra.sh" 'pypykatz' \
 group "Config syntax: on-demand AI stack (Docker/Ollama/DeepSeek Harness)"
 AI_EXTRA="$REPO_ROOT/client/configs/ai-extra.sh"
 assert_file "$AI_EXTRA" "ai-extra.sh exists"
-# The AI runtime stack (docker toolbox + nodejs) ships as a lazy apk list so it
+# The AI runtime stack (docker toolbox + bun) ships as a lazy apk list so it
 # installs ONLY on demand, never into the 4G tmpfs root at boot.
 assert_file "$REPO_ROOT/client/configs/ai-apks.list" "ai-apks.list exists"
 assert_contains "$REPO_ROOT/client/configs/ai-apks.list" 'docker' "ai list loads docker"
-assert_contains "$REPO_ROOT/client/configs/ai-apks.list" 'nodejs' "ai list loads nodejs"
-assert_contains "$REPO_ROOT/client/configs/ai-apks.list" 'npm' "ai list loads npm"
-assert_contains "$REPO_ROOT/client/configs/ai-apks.list" 'pnpm' "ai list loads pnpm"
+assert_contains "$REPO_ROOT/client/configs/ai-apks.list" 'bun' "ai list loads bun"
 # The docker toolbox package names MUST be valid Alpine edge packages: it is
 # docker-cli-buildx / docker-cli-compose, NOT docker-buildx / docker-compose
 # (a wrong name makes `apk add` fail and the whole ISO build exit 1 - seen in CI).

@@ -10,11 +10,11 @@
 #   sudo /usr/local/bin/ai-extra.sh [start|stop|status]
 #
 # What it does:
-#   1. apk-add the lazy docker + nodejs stack from the live ISO repo (offline).
+#   1. apk-add the lazy docker + bun stack from the live ISO repo (offline).
 #   2. Locate + loop-mount the on-disk Ollama squashfs (myi2pd-ollama.squashfs).
 #   3. Start dockerd, docker-load the Ollama image, run it with GPU detection
 #      (NVIDIA via --gpus all, AMD via /dev/kfd+/dev/dri, else CPU).
-#   4. Install/Run DeepSeek Harness (dsh) via npx (downloads @deepseek-ai/dsh from npm).
+#   4. Run DeepSeek Harness (dsh) via `bunx @deepseek-ai/dsh web` on port 3080.
 #   5. Lay down the ingrained agent context (~/.deepseek-harness/CLAUDE.md) + config
 #      that points at the local Ollama server.
 
@@ -76,11 +76,11 @@ detect_gpu() {
     fi
 }
 
-ensure_docker_and_node() {
-    if need docker && need dockerd && need node && need npx; then
-        log "docker + node already present"
+ensure_docker_and_bun() {
+    if need docker && need dockerd && need bun; then
+        log "docker + bun already present"
     else
-        log "loading docker + nodejs stack from ISO repo (offline)"
+        log "loading docker + bun stack from ISO repo (offline)"
         apk add --quiet $(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' /etc/ai-apks.list)
     fi
     if ! rc-service docker status >/dev/null 2>&1; then
@@ -90,7 +90,7 @@ ensure_docker_and_node() {
     for i in $(seq 1 20); do
         docker info >/dev/null 2>&1 && break || sleep 1
     done
-    log "Node: $(node --version), npm: $(npm --version), npx: $(npx --version)"
+    log "Bun: $(bun --version)"
 }
 
 stop() {
@@ -108,12 +108,12 @@ run_dsh() {
     # Allow firewall access to DSH web UI
     nft add rule inet filter output tcp dport $DSH_PORT accept 2>/dev/null || true
     
-    # Run DSH via npx - it will download @deepseek-ai/dsh from npm on first run
+    # Run DSH via bunx - it will download @deepseek-ai/dsh from npm on first run
     # DSH reads OLLAMA_BASE_URL env for the local model server
     OLLAMA_BASE_URL="$OLLAMA_URL" \
     DSH_HOST=127.0.0.1 \
     DSH_PORT=$DSH_PORT \
-    npx --yes @deepseek-ai/dsh@latest web --host 127.0.0.1 --port $DSH_PORT --no-open \
+    bunx --yes @deepseek-ai/dsh@latest web --host 127.0.0.1 --port $DSH_PORT --no-open \
         > /tmp/dsh.log 2>&1 &
     local dsh_pid=$!
     echo $dsh_pid > /tmp/dsh.pid
@@ -129,7 +129,7 @@ run_dsh() {
 
 install_agent_context() {
     mkdir -p /root/.deepseek-harness /root/.claude
-    # Layer CLAUDE.md for any agent (Claurst, DSH, etc.)
+    # Layer CLAUDE.md for any agent (DSH, etc.)
     install -m 0644 /usr/local/share/myi2pd/CLAUDE.md /root/.claude/CLAUDE.md 2>/dev/null \
         || install -m 0644 /usr/local/share/myi2pd/AGENTS.md /root/.claude/CLAUDE.md
     # DeepSeek Harness config: point to local Ollama
@@ -166,7 +166,7 @@ case "$ACTION" in
         ;;
 esac
 
-ensure_docker_and_node
+ensure_docker_and_bun
 start_squashfs
 [ -n "${OLLAMA_MNT:-}" ] || exit 1
 

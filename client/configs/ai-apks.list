@@ -1,5 +1,5 @@
 # client/configs/ai-apks.list
-# Minimal container runtime (Docker) + Node.js (for DeepSeek Harness) needed
+# Minimal container runtime (Docker) + Bun (for DeepSeek Harness) needed
 # to run the on-demand Ollama GPU container + dsh. These are LAZY-LOADED:
 # the .apk files are baked into the ISO's on-disk repository so ai-extra.sh
 # can install them OFFLINE on demand, but they are NOT written to
@@ -10,6 +10,4 @@ docker
 docker-cli
 docker-cli-buildx
 docker-cli-compose
-nodejs
-npm
-pnpm
+bun
