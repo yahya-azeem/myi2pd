@@ -25,8 +25,16 @@ if [ -z "$WLAN_INTF" ]; then
 fi
 WLAN_INTF=${WLAN_INTF:-wlan0}
 
-echo "Using wireless interface: $WLAN_INTF"
-ip link set "$WLAN_INTF" up || true
+# MAC address spoofing - randomize before any network activity
+echo "Spoofing MAC address..."
+ORIG_MAC=$(cat /sys/class/net/"$WLAN_INTF"/address 2>/dev/null || echo "unknown")
+NEW_MAC=$(printf '02:%02x:%02x:%02x:%02x:%02x' \
+    $((RANDOM % 256)) $((RANDOM % 256)) $((RANDOM % 256)) \
+    $((RANDOM % 256)) $((RANDOM % 256)))
+ip link set "$WLAN_INTF" down
+ip link set "$WLAN_INTF" address "$NEW_MAC"
+ip link set "$WLAN_INTF" up
+echo "MAC changed: $ORIG_MAC -> $NEW_MAC"
 sleep 1
 
 echo "Scanning for available Wi-Fi networks..."
