@@ -14,46 +14,48 @@ echo "[myi2pd] PID: $$" | tee /dev/ttyS0
 echo "[myi2pd] tty: $(tty)" | tee /dev/ttyS0
 echo "[myi2pd] input devices:" | tee /dev/ttyS0
 ls -la /dev/input/ 2>&1 | tee /dev/ttyS0
+
 echo "[myi2pd] libinput list:" | tee /dev/ttyS0
 libinput list-devices 2>&1 | tee /dev/ttyS0
+
 echo "[myi2pd] udevadm info:" | tee /dev/ttyS0
 for dev in /dev/input/event*; do
   [ -e "$dev" ] && udevadm info --query=property "$dev" 2>&1 | tee /dev/ttyS0 || true
 done
+
 echo "[myi2pd] DRM devices:" | tee /dev/ttyS0
 ls -la /dev/dri/ 2>&1 | tee /dev/ttyS0
 
-# Auto-connect TrustTunnel if VPS IP is pre-configured
-if [ -f /etc/trusttunnel/vps_ip.txt ]; then
-    VPS_IP=$(cat /etc/trusttunnel/vps_ip.txt)
+# Auto-connect VLESS + XTLS-Reality if VPS IP is pre-configured
+if [ -f /etc/xray/vps_ip.txt ]; then
+    VPS_IP=$(cat /etc/xray/vps_ip.txt)
     nft add element inet filter vps_ip { "${VPS_IP}" } 2>/dev/null || \
       echo "[myi2pd] nftables vps_ip set not ready yet"
-    echo "[myi2pd] auto-connecting TrustTunnel to $VPS_IP:443..."
-    cat > /tmp/trusttunnel-client.toml <<EOF
-[endpoint]
-address = "${VPS_IP}:443"
-skip_verification = true
-username = "myi2pduser"
-password = "myi2pdsecurepassword"
-
-[vpn]
-mode = "tun"
-tunnel_name = "tun0"
+    echo "[myi2pd] auto-connecting VLESS + XTLS-Reality to $VPS_IP:443..."
+    cat > /tmp/vless-client.toml <<EOF
+[outbounds]
+protocol = "vless"
+settings = { "vnext": [{ "address": "${VPS_IP}", "port": 443, "users": [{ "id": "${VLESS_UUID:-6ec29699-d029-4eb0-a72b-93b54d5b9f25}", "flow": "xtls-rprx-vision", "encryption": "none", "level": 0 }] }] }
+[outbounds.streamSettings]
+network = "tcp"
+security = "reality"
+realitySettings = { "show": "", "dest": "www.microsoft.com:443", "xver": 0, "serverNames": ["www.microsoft.com:443"], "publicKey": "${REALITY_PUBKEY:-}", "shortIds": ["${SHORT_ID:-abcd1234}"] }
+[outbounds.mux]
+enabled = false
 EOF
-    /usr/local/bin/trusttunnel_client --config /tmp/trusttunnel-client.toml &
+    /usr/local/bin/xray -c /tmp/vless-client.toml &
     /usr/local/bin/i2p-keepalive.sh &
 fi
 
 echo "[myi2pd] waiting for udev..." | tee /dev/ttyS0
 udevadm settle 2>&1 | tee /dev/ttyS0
-# Force udev to re-process input devices to set ID_INPUT properties
 udevadm trigger --subsystem-match=input --action=change 2>&1 | tee /dev/ttyS0
 udevadm settle 2>&1 | tee /dev/ttyS0
 sleep 2
-# seatd is already started by OpenRC at boot — don't kill it
+
 echo "[myi2pd] waiting extra for connector init..." | tee /dev/ttyS0
 sleep 2
-# Rebuild font cache to pick up SauceCodePro Nerd Font from overlay
+
 echo "[myi2pd] rebuilding font cache..." | tee /dev/ttyS0
 fc-cache -f 2>&1 | tee /dev/ttyS0
 echo "[myi2pd] ready"

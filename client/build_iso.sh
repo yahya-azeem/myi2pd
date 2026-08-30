@@ -185,6 +185,8 @@ ncneofetch
 neomutt
 util-linux
 util-linux-misc
+libinput
+agetty
 EOF
 
 # Configure basic loopback, ethernet, and wireless interface config in overlay

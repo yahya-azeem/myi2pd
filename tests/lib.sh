@@ -237,23 +237,22 @@ fuzzel
 waybar
 foot
 font-dejavu
-fontconfig
 seatd
 seatd-launch
 dbus
 dbus-x11
 dbus-openrc
-librewolf
 mesa-dri-gallium
 swaybg
 udev
-util-linux
-util-linux-misc
-agetty
-libdrm-tests
+fontconfig
 ncneofetch
 neomutt
-linux-firmware-none
+util-linux
+util-linux-misc
+libinput
+librewolf
+agetty
 WORLDFILE
 
     # Append FOSS pentest tooling to world (mirrors assemble-iso). Source of
