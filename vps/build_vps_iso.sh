@@ -1,15 +1,15 @@
 #!/bin/bash
 # build_vps_iso.sh - Build myi2pd VPS Gateway ISO
+# Everything pre-built: Xray binary, Reality keys, UUID, shortId, Xray config
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 OVERLAY_TMP="$SCRIPT_DIR/overlay-tmp"
 OUT_DIR="$SCRIPT_DIR/out"
 
-echo "=== Building myi2pd VPS Gateway ISO ==="
+echo "=== Building myi2pd VPS Gateway ISO (pre-built Reality config) ==="
 
 echo "Cleaning up..."
-# Remove root-owned apk files that may persist from previous builds
 rm -f "$OVERLAY_TMP/etc/apk/world" 2>/dev/null || true
 rmdir "$OVERLAY_TMP/etc/apk" 2>/dev/null || true
 rm -rf "$OVERLAY_TMP" "$OUT_DIR" 2>/dev/null || true
@@ -22,18 +22,92 @@ mkdir -p "$OVERLAY_TMP/etc/init.d" \
          "$OVERLAY_TMP/etc/i2pd" \
          "$OVERLAY_TMP/etc/network" \
          "$OVERLAY_TMP/etc/sysctl.d" \
+         "$OVERLAY_TMP/etc/xray" \
          "$OVERLAY_TMP/usr/local/bin" \
          "$OVERLAY_TMP/root"
 
-echo "Copying binaries..."
-# Use Xray binary (pre-built or from path)
-if [ -x /tmp/xray/xray ]; then
-    cp /tmp/xray/xray "$OVERLAY_TMP/usr/local/bin/"
-elif [ -x /usr/local/bin/xray ]; then
-    cp /usr/local/bin/xray "$OVERLAY_TMP/usr/local/bin/"
-else
-    echo "WARNING: Xray binary not found, overlay will include placeholder"
+echo "Ensuring Xray binary available..."
+if [ ! -x /tmp/xray/xray ] && [ ! -x /usr/local/bin/xray ]; then
+    echo "Downloading Xray..."
+    mkdir -p /tmp/xray
+    curl -sL "https://github.com/XTLS/Xray-core/releases/latest/download/xray-linux-64.zip" -o /tmp/xray.zip
+    unzip -o /tmp/xray.zip -d /tmp/xray
+    chmod +x /tmp/xray/xray
 fi
+
+XRAY_BIN="/tmp/xray/xray"
+[ -x "$XRAY_BIN" ] || XRAY_BIN="/usr/local/bin/xray"
+
+echo "Generating Reality keys and config..."
+X25519=$("$XRAY_BIN" x25519 | awk '{print $2}')
+VLESS_UUID=$("$XRAY_BIN" uuid)
+SHORT_ID=$(xxd -l 8 -p /dev/urandom)
+DEST="www.microsoft.com:443"
+
+echo "  UUID: $VLESS_UUID"
+echo "  ShortID: $SHORT_ID"
+echo "  Dest: $DEST"
+
+# Save credentials for client provisioning
+mkdir -p "$OVERLAY_TMP/etc/xray"
+cat > "$OVERLAY_TMP/etc/xray/creds.json" <<EOF
+{
+  "vps_ip": "AUTO",
+  "uuid": "$VLESS_UUID",
+  "pubkey": "$X25519",
+  "short_id": "$SHORT_ID",
+  "dest": "$DEST"
+}
+EOF
+
+# Pre-generate Xray config.json
+cat > "$OVERLAY_TMP/etc/xray/config.json" <<EOF
+{
+  "inbounds": [{
+    "listen": "0.0.0.0",
+    "port": 443,
+    "protocol": "vless",
+    "settings": {
+      "clients": [{
+        "id": "$VLESS_UUID",
+        "flow": "xtls-rprx-vision",
+        "email": "myi2pd-client"
+      }],
+      "decryption": "none"
+    },
+    "streamSettings": {
+      "network": "tcp",
+      "security": "reality",
+      "realitySettings": {
+        "show": false,
+        "dest": "$DEST",
+        "xver": 0,
+        "serverNames": ["$DEST"],
+        "privateKey": "$X25519",
+        "shortIds": ["", "$SHORT_ID", "0123456789abcdef"]
+      }
+    },
+    "sniffing": {"enabled": true, "destOverride": ["http", "tls", "quic"], "routeOnly": true}
+  }],
+  "outbounds": [{"protocol": "freedom", "tag": "direct"}],
+  "policy": {
+    "levels": {
+      "0": {
+        "bufferSize": 2,
+        "handshake": 4,
+        "connIdle": 300,
+        "uplinkOnly": 2,
+        "downlinkOnly": 5,
+        "statsUserUplink": true,
+        "statsUserDownlink": true
+      }
+    }
+  }
+}
+EOF
+
+echo "Copying binaries..."
+cp "$XRAY_BIN" "$OVERLAY_TMP/usr/local/bin/xray"
 cp "$SCRIPT_DIR/bin/setup_wizard" "$OVERLAY_TMP/usr/local/bin/"
 chmod +x "$OVERLAY_TMP/usr/local/bin/"*
 
@@ -42,9 +116,10 @@ cp "$SCRIPT_DIR/configs/i2pd.conf" "$OVERLAY_TMP/etc/i2pd/i2pd.conf"
 cp "$SCRIPT_DIR/configs/nftables.nft" "$OVERLAY_TMP/etc/nftables.nft"
 
 echo "Populating i2pd netDb with reseed data..."
+mkdir -p "$OVERLAY_TMP/var/lib/i2pd/netDb"
 cp -r "$SCRIPT_DIR/netDb/"* "$OVERLAY_TMP/var/lib/i2pd/netDb/"
 
-# Create xray init script with VLESS+XTLS-Reality configuration
+# Create xray init script (no runtime generation needed)
 cat > "$OVERLAY_TMP/etc/init.d/xray" << 'INITEOF'
 #!/sbin/openrc-run
 name="xray"
@@ -52,24 +127,12 @@ description="Xray VLESS + XTLS-Reality Endpoint Daemon"
 command="/usr/local/bin/xray"
 command_args="-conf /etc/xray/config.json"
 command_background=true
-pidfile="/run/RC_SVCNAME.pid"
+pidfile="/run/xray.pid"
 depend() { need net; after nftables; }
-start_pre() {
-    [ -d /etc/xray ] || mkdir -p /etc/xray
-    [ -f /etc/xray/config.json ] || {
-        X25519=$(/usr/local/bin/xray x25519 | awk '{print $2}')
-        VLESS_UUID=$(/usr/local/bin/xray uuid)
-        SHORT_ID=$(xxd -l 8 -p /dev/urandom)
-        DEST="microsoft.com:443"
-        cat > /etc/xray/config.json << EOFJSON
-{"inbounds":[{"listen":"0.0.0.0","port":443,"protocol":"vless","settings":{"clients":[{"id":"$VLESS_UUID","flow":"","email":"user@example.com"}],"decryption":"none"},"streamSettings":{"network":"tcp","security":"reality","realitySettings":{"show":"","dest":"$DEST","xver":0,"serverNames":["$DEST"],"privateKey":"$X25519","shortIds":["$SHORT_ID"]}},"sniffing":{"enabled":true,"destOverride":["http","tls","quic"]}}],"outbounds":[{"protocol":"freedom","tag":"direct"}]}
-EOFJSON
-    }
-}
 INITEOF
 chmod +x "$OVERLAY_TMP/etc/init.d/xray"
 
-# Create eth1-lan init script - fixes i2pd data dir perms, then configures private LAN IP
+# Create eth1-lan init script
 cat > "$OVERLAY_TMP/etc/init.d/eth1-lan" << 'LANEOF'
 #!/sbin/openrc-run
 description="Private LAN interface for client VMs"
@@ -87,12 +150,27 @@ start() {
 LANEOF
 chmod +x "$OVERLAY_TMP/etc/init.d/eth1-lan"
 
+# Create i2pd init script (fallback if package doesn't provide one)
+cat > "$OVERLAY_TMP/etc/init.d/i2pd" << 'I2PDEOF'
+#!/sbin/openrc-run
+name="i2pd"
+description="I2P Daemon"
+command="/usr/bin/i2pd"
+command_args="--conf=/etc/i2pd/i2pd.conf"
+command_background=true
+pidfile="/run/i2pd.pid"
+depend() { need net; }
+I2PDEOF
+chmod +x "$OVERLAY_TMP/etc/init.d/i2pd"
+
 # Create /root/.profile
 cat > "$OVERLAY_TMP/root/.profile" << 'PROFEOF'
 [ -f /etc/profile ] && . /etc/profile
 echo "=== myi2pd VPS Gateway ==="
 echo "Xray status: $(rc-service xray status 2>/dev/null | grep -o 'started\|stopped' || echo 'unknown')"
+echo "I2P status: $(rc-service i2pd status 2>/dev/null | grep -o 'started\|stopped' || echo 'unknown')"
 echo "eth0: $(ip -4 addr show eth0 2>/dev/null | grep -o 'inet [0-9.]*' | cut -d' ' -f2)"
+echo "Xray config: /etc/xray/config.json (pre-built Reality)"
 PROFEOF
 
 # VPS inittab with autologin on serial console
@@ -135,9 +213,7 @@ auto eth0
 iface eth0 inet dhcp
 INTFEOF
 
-# APK world file - tells initramfs which packages to install at boot
-# Without this file, only alpine-base is installed and all other packages
-# (river, librewolf, etc.) sit unused on the ISO media.
+# APK world file
 mkdir -p "$OVERLAY_TMP/etc/apk"
 cat > "$OVERLAY_TMP/etc/apk/world" << 'WORLDF'
 alpine-base
@@ -145,32 +221,13 @@ ca-certificates
 nftables
 bash
 openssl
-wireless-tools
-wpa_supplicant
-e2fsprogs
-river-classic
-fuzzel
-waybar
-foot
-font-dejavu
-seatd
-seatd-launch
-dbus
-dbus-x11
-dbus-openrc
-mesa-dri-gallium
-mesa-gbm
-mesa-egl
-swaybg
-librewolf
-libdrm-tests
-udev
-fontconfig
-ncneofetch
-neomutt
-util-linux
-util-linux-misc
-EOF
+curl
+i2pd
+i2pd-openrc
+nftables-openrc
+dnsmasq
+dnsmasq-openrc
+WORLDF
 
 # Build the custom vps-builder Docker image if not present
 if ! docker image inspect myi2pd-builder:vps >/dev/null 2>&1; then
@@ -233,3 +290,6 @@ echo "Cleaning up..."
 rm -rf "$OVERLAY_TMP" "$OUT_DIR" 2>/dev/null || true
 
 echo "=== VPS ISO build finished! ==="
+echo "Pre-built credentials saved to /etc/xray/creds.json on the ISO"
+echo "Use these to configure client:"
+cat "$OVERLAY_TMP/etc/xray/creds.json" 2>/dev/null || echo "  (run again to see creds)"

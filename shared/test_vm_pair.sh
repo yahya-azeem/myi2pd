@@ -73,11 +73,78 @@ if [ -f /mnt/cidata/bin/xray ]; then
 fi
 cp /mnt/cidata/bin/setup_wizard /usr/local/bin/
 chmod +x /usr/local/bin/*
+
+# Generate pre-built creds.json and config.json for test environment (normally baked into ISO)
+mkdir -p /etc/xray
+XRAY_BIN="/usr/local/bin/xray"
+if [ ! -x "$XRAY_BIN" ] && [ -f /mnt/cidata/bin/xray ]; then
+    XRAY_BIN="/mnt/cidata/bin/xray"
+fi
+X25519=$("$XRAY_BIN" x25519 | awk '{print $2}')
+VLESS_UUID=$("$XRAY_BIN" uuid)
+SHORT_ID=$(xxd -l 8 -p /dev/urandom)
+DEST="www.microsoft.com:443"
+cat > /etc/xray/creds.json <<CREEOF
+{
+  "vps_ip": "10.0.2.15",
+  "uuid": "$VLESS_UUID",
+  "pubkey": "$X25519",
+  "short_id": "$SHORT_ID",
+  "dest": "$DEST"
+}
+CREEOF
+
+# Generate Xray config.json
+cat > /etc/xray/config.json <<CONFIGEOF
+{
+  "inbounds": [{
+    "listen": "0.0.0.0",
+    "port": 443,
+    "protocol": "vless",
+    "settings": {
+      "clients": [{
+        "id": "$VLESS_UUID",
+        "flow": "xtls-rprx-vision",
+        "email": "myi2pd-client"
+      }],
+      "decryption": "none"
+    },
+    "streamSettings": {
+      "network": "tcp",
+      "security": "reality",
+      "realitySettings": {
+        "show": false,
+        "dest": "$DEST",
+        "xver": 0,
+        "serverNames": ["$DEST"],
+        "privateKey": "$X25519",
+        "shortIds": ["", "$SHORT_ID", "0123456789abcdef"]
+      }
+    },
+    "sniffing": {"enabled": true, "destOverride": ["http", "tls", "quic"], "routeOnly": true}
+  }],
+  "outbounds": [{"protocol": "freedom", "tag": "direct"}],
+  "policy": {
+    "levels": {
+      "0": {
+        "bufferSize": 2,
+        "handshake": 4,
+        "connIdle": 300,
+        "uplinkOnly": 2,
+        "downlinkOnly": 5,
+        "statsUserUplink": true,
+        "statsUserDownlink": true
+      }
+    }
+  }
+}
+CONFIGEOF
+
 echo "Setting up private LAN on eth1..."
 ip addr add 10.10.10.1/24 dev eth1 2>/dev/null || true
 ip link set eth1 up
 echo "Starting DHCP/DNS on eth1..."
-apk add dnsmasq
+apk add dnsmasq curl
 dnsmasq --dhcp-range=10.10.10.10,10.10.10.20,255.255.255.0 \
         --interface=eth1 --no-daemon \
         --log-dhcp --dhcp-option=3,10.10.10.1 \
@@ -98,6 +165,12 @@ if [ -w /dev/kvm ]; then
     ACCEL_ARGS=("-enable-kvm" "-cpu" "host")
 fi
 
+# Headless mode for CI/headless environments
+DISPLAY_ARGS=("-nographic")
+if [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
+    DISPLAY_ARGS=("-vga" "std" "-display" "gtk")
+fi
+
 VPS_PID=""
 
 if [ "$RUN_SERVER" = true ]; then
@@ -112,11 +185,11 @@ if [ "$RUN_SERVER" = true ]; then
             -cdrom "$CIDATA_ISO" \
             -netdev user,id=net0 -device virtio-net-pci,netdev=net0 \
             -netdev socket,id=net1,listen=:12345 -device virtio-net-pci,netdev=net1 \
-            -vga std -display gtk \
+            "${DISPLAY_ARGS[@]}" \
             -serial file:"$VPS_LOG" &
         VPS_PID=$!
         echo "Waiting for VPS to finish booting (polling serial log)..."
-        for i in $(seq 1 120); do
+        for i in $(seq 1 180); do
             grep -q "VPS Gateway Setup Complete" "$VPS_LOG" 2>/dev/null && break
             sleep 2
         done
@@ -127,19 +200,19 @@ if [ "$RUN_SERVER" = true ]; then
             -cdrom "$CIDATA_ISO" \
             -netdev user,id=net0 -device virtio-net-pci,netdev=net0 \
             -netdev socket,id=net1,listen=:12345 -device virtio-net-pci,netdev=net1 \
-            -vga std -display gtk \
+            "${DISPLAY_ARGS[@]}" \
             -serial file:"$VPS_LOG"
     fi
 fi
 
 if [ "$RUN_CLIENT" = true ]; then
     rm -f "$CLIENT_LOG"
-    echo "Starting Client ISO (GUI, logging to $CLIENT_LOG)..."
+    echo "Starting Client ISO (logging to $CLIENT_LOG)..."
     if [ "$RUN_SERVER" = true ]; then
         qemu-system-x86_64 "${ACCEL_ARGS[@]}" -m 1G \
             -cdrom "$ISO_PATH" -boot d \
             -netdev socket,id=net0,connect=127.0.0.1:12345 -device virtio-net-pci,netdev=net0 \
-            -vga std -display gtk \
+            "${DISPLAY_ARGS[@]}" \
             -serial file:"$CLIENT_LOG"
     else
         qemu-system-x86_64 "${ACCEL_ARGS[@]}" -m 1G \
